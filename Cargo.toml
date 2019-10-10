@@ -1,0 +1,21 @@
+[package]
+name = "lambix"
+version = "0.1.0"
+authors = ["Lamb <contact@lambixtowolf.me>"]
+edition = "2018"
+
+[dependencies]
+bitflags = "1.2.0"
+lib = { path = "lib/" }
+
+[build-dependencies]
+sha1 = "0.6"
+
+[profile.dev]
+panic = 'abort'
+incremental = true
+
+[profile.release]
+panic = 'abort'
+incremental = true
+
