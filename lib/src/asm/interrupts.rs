@@ -15,6 +15,8 @@ macro_rules! isr {
             $($body:tt)*
         })*
     ) => {
+        use lib::{enable_interrupts, disable_interrupts};
+
         $(unsafe extern "x86-interrupt" fn $name() {
             disable_interrupts!();
             $($body)*
