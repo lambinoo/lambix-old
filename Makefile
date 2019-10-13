@@ -26,7 +26,7 @@ ifeq ($(PROFILE),release)
     CARGO_FLAGS = --release
 endif
 
-build-iso: build
+build-iso: build symbols
 	mkdir -p $(BUILD_DIR)/isodir/boot/grub
 	cp $(KERNEL) $(BUILD_DIR)/isodir/boot/$(KERNEL_NAME)
 	cp $(BUILD_DIR)/grub.cfg $(BUILD_DIR)/isodir/boot/grub
@@ -51,7 +51,9 @@ clean:
 rebuild: clean build
 
 debug:
-	$(GDB) $(KERNEL) -ex "target remote | $(QEMU) $(QEMU_FLAGS) -S -gdb stdio"
+	$(GDB) \
+		-ex "target remote | $(QEMU) $(QEMU_FLAGS) -S -gdb stdio -monitor pty" \
+		-ex "symbol-file $(KERNEL)" \
 
 run:
 	$(QEMU) $(QEMU_FLAGS) -monitor stdio -S
