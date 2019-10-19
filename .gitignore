@@ -1,5 +1,6 @@
 /build/
 !build/grub.cfg
+*.log
 
 # Created by https://www.gitignore.io/api/rust,intellij+all
 # Edit at https://www.gitignore.io/?templates=rust,intellij+all

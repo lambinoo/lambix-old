@@ -1,7 +1,5 @@
 #[macro_use]
+pub mod early_kprintln;
 pub mod vga_buffer;
-
-extern {
-    pub static multiboot_header_addr: u32;
-}
+pub mod multiboot;
 

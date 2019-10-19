@@ -114,6 +114,7 @@ impl<'c> Compiler<'c> {
             if path.is_dir() {
                 Compiler::compile_files_in_directory(&path, out_dir, out_files)?;
             } else if path.is_file() && path.extension().unwrap_or_default() == "S" {
+                println!("rerun-if-changed={}", path.to_string_lossy());
                 Compiler::compile_file(&path, out_dir, out_files)?;
             }
         }

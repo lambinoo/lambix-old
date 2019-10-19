@@ -20,7 +20,6 @@
     },
     "features": "-sse,-mmx,+soft-float",
     "executables": true,
-    "relocation-model": "pic",
     "disable-redzone": true,
     "linker-is-gnu": true,
     "position_independent_executables": true,

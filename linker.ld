@@ -2,7 +2,7 @@ ENTRY(_start)
 
 SECTIONS {
     . = 1M;
-   
+    kernel_start_addr = .;
     .multiboot2 : {
         KEEP(*(.multiboot2))
     }
@@ -24,5 +24,6 @@ SECTIONS {
         *(.text32 .text32.*)
         *(.text .text.*)
     }
+    kernel_end_addr = .;
 }
 

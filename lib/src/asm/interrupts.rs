@@ -1,4 +1,11 @@
 #[macro_export]
+macro_rules! int {
+    ($vector:expr) => {
+        asm!("int $0" :: "N"($vector))
+    }
+}
+
+#[macro_export]
 macro_rules! enable_interrupts {
     () => { asm!("sti") }
 }
@@ -15,12 +22,13 @@ macro_rules! isr {
             $($body:tt)*
         })*
     ) => {
-        use lib::{enable_interrupts, disable_interrupts};
-
         $(unsafe extern "x86-interrupt" fn $name() {
-            disable_interrupts!();
-            $($body)*
-            enable_interrupts!();
+            {
+                use lib::{enable_interrupts, disable_interrupts};
+                disable_interrupts!();
+                $($body)*
+                enable_interrupts!();
+            }
         })*
     };
 }

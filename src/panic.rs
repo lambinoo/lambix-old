@@ -11,7 +11,7 @@ pub fn panic(info: &PanicInfo) -> ! {
     }
 
     if let Some(message) = info.message() {
-        early_kprintln!("Reason: {}", message);
+        early_kprintln!("Reason: {:?}", message);
     }
 
     early_kprintln!("\nAdditional Information:");

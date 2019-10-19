@@ -13,8 +13,6 @@ pub struct VGABuffer {
     current_color: u8
 }
 
-unsafe impl Send for VGABuffer {}
-
 fn _ref<'a, T>(ptr: *mut T) -> &'a mut T {
     unsafe { &mut *ptr }
 }

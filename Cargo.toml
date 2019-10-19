@@ -18,4 +18,5 @@ incremental = true
 [profile.release]
 panic = 'abort'
 incremental = true
+debug = true
 

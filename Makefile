@@ -7,11 +7,15 @@ TARGET_TRIPLE=x86_64-unknown-$(KERNEL_NAME)
 # binaries
 GRUB_MKRESCUE = grub-mkrescue
 QEMU=qemu-system-x86_64
-GDB=rust-gdb
+GDB=gdb
 
 # config
 ifneq ($(PROFILE),release)
-    PROFILE=debug
+	PROFILE=debug
+endif
+
+ifndef RUSTFLAGS
+	RUSTFLAGS="-A dead_code"
 endif
 
 # path
@@ -20,7 +24,7 @@ LINKER_SCRIPT = linker.ld
 KERNEL = target/$(TARGET_TRIPLE)/$(PROFILE)/$(KERNEL_NAME)
 
 # debug
-QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown
+QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log
 
 ifeq ($(PROFILE),release)
     CARGO_FLAGS = --release
@@ -34,7 +38,10 @@ build-iso: build symbols
 
 # Build the kernel
 build:
-	cargo xbuild --target=$(shell pwd)/$(TARGET_TRIPLE).json $(CARGO_FLAGS)
+	RUSTFLAGS=$(RUSTFLAGS) cargo xbuild --target=$(shell pwd)/$(TARGET_TRIPLE).json $(CARGO_FLAGS)
+
+check:
+	RUSTFLAGS=$(RUSTFLAGS) cargo check
 
 symbols:
 	nm $(KERNEL) | awk '{print $$1 " " $$3}' > $(BUILD_DIR)/symbols 

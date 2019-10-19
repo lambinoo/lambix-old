@@ -21,18 +21,3 @@ pub fn _print(args: Arguments) {
         .expect("early_printk failed when trying to write to vga text buffer")
 }
 
-#[macro_export]
-macro_rules! early_kprint {
-    ($($arg:tt)*) => (
-        $crate::boot::vga_buffer::_print(format_args!( $($arg)* ))
-    )
-}
-
-#[macro_export]
-macro_rules! early_kprintln {
-    () => ( early_kprint!("\n") );
-    ($($arg:tt)*) => (
-        $crate::boot::vga_buffer::_print(format_args_nl!( $($arg)* ))
-    )
-}
-

@@ -1,6 +1,10 @@
+default rel
+
 global _start
 global multiboot_header_addr
 extern kernel_main
+extern KERNEL_VIRTUAL_START
+extern kernel_start_addr
 
 section .multiboot2  align=32
 start:
@@ -15,24 +19,28 @@ start:
 end:
 
 ;-----------------------
-section .stack nobits align=32
+section .init.stack nobits align=32
 stack_end:
     resb 4096
 stack_start:
 
 ;-----------------------
-section .bootdata.paging nobits align=4096
+section .init.paging nobits align=4096
 pml4e_table:
     resb 4096
-pdpe_table:
+pdpe_table_first_gb:
     resb 4096
-pde_table:
+pde_table_first_gb:
+    resb 4096
+pdpe_early_kernel_space:
+    resb 4096
+pde_early_kernel_space:
     resb 4096
 
 ;-----------------------
-section .bootdata align=32
+section .init.gdt_table align=4096
 gdt_table:
-    .null: equ $ - gdt_table
+    .null:
         dq 0
     .code: equ $ - gdt_table
         dw 0xffff
@@ -61,10 +69,9 @@ gdt_table:
     .data64: equ $ - gdt_table
         dd 0
         dd (1 << 15) | (1 << 12)
-
     .register:
         dw $ - gdt_table - 1
-        dd gdt_table    
+        dd gdt_table
 errors:
     .no_multiboot: db 'Multiboot2 not supported by bootloader', 0
     .halting: db 'Halting processor, goodbye !', 0
@@ -73,7 +80,7 @@ errors:
 ;-----------------------
 section .data align=32
 multiboot_header_addr:
-    dd 0
+    dd 01
 
 ;-----------------------
 section .text32 align=32
@@ -107,13 +114,15 @@ init_paging:
 
     ; we will map the first GB of memory here, so we only need
     ; one entry in the pml4e and pdpe table
-    mov eax, pdpe_table 
+    mov eax, pdpe_table_first_gb
     or eax, 0b11
     mov [pml4e_table], eax
 
-    mov eax, pde_table
+    ; and we will also map the last GB, which 
+
+    mov eax, pde_table_first_gb
     or eax, 0b11
-    mov [pdpe_table], eax
+    mov [pdpe_table_first_gb], eax
 
     mov ecx, 0
 .loop:
@@ -121,7 +130,8 @@ init_paging:
     shl eax, 21
     or eax, 0b11 | (1 << 7); PAT + write + present
 
-    mov [pde_table + 8 * ecx], eax
+    mov [pde_table_first_gb + 8 * ecx], eax 
+
     inc ecx
     cmp ecx, 512
     jne .loop
@@ -148,7 +158,7 @@ init_paging:
     test eax, 1 << 10
     jz early_panic 
 
-    jmp gdt_table.code64:kernel_main
+    jmp gdt_table.code64:_start64
 
     mov esi, errors.halting
 early_panic:
@@ -163,8 +173,64 @@ early_panic:
         inc esi
         jmp .loop
     .end_loop:
-
 halt_processor:
     hlt
     jmp halt_processor
+
+
+section .text align=64
+bits 64
+; 64 bits entry points
+_start64:
+	jmp kernel_main
+
+	;;; TODO
+	;;; DEAD CODE, kernel relocation
+
+	; we are on, let's setup the kernel virtual address space
+	mov rax, [KERNEL_VIRTUAL_START]
+
+	mov rdx, kernel_start_addr
+	mov rcx, 0
+	.loop:
+		mov rbx, rdx
+		or rbx, 0b11 | (1 << 7)
+		mov [pde_early_kernel_space + 8 * rcx], rbx
+		add rdx, 0x100000
+		inc rcx
+		cmp rcx, 512
+		jne .loop	
+
+	mov rbx, pde_early_kernel_space
+	or rbx, 0b11
+	mov rcx, rax
+	shr rcx, 30
+	and rcx, 0x1ff
+	mov [pdpe_early_kernel_space + 8 * rcx], rbx
+
+	mov rbx, pdpe_early_kernel_space
+	or rbx, 0b11 ; write + present
+	mov rcx, rax
+	shr rcx, 39
+	and rcx, 0x1ff
+	mov [pml4e_table + 8 * rcx], rbx
+
+        ; reload pml4e table (delete cache from TLB)
+	mov rax, pml4e_table
+	mov cr3, rax
+
+	; compute new kernel_main address
+	mov rax, kernel_main
+	add rax, [KERNEL_VIRTUAL_START] 
+	sub rax, kernel_start_addr
+
+	; reset stack before jumping to rust code <3
+	xor rbp, rbp
+	mov rsp, stack_start
+
+	; jump to newly mapped kernel_main
+jump_to_mapped_kernel:
+	jmp kernel_main
+
+
 
