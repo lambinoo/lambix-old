@@ -7,38 +7,42 @@
     abi_x86_interrupt,
     panic_info_message,
     const_transmute,
-    range_is_empty
+    range_is_empty,
+    alloc_error_handler
 )]
+
+extern crate alloc;
+use lib::*;
+use alloc::*;
 
 #[macro_use]
 pub mod boot;
 pub mod kernel;
 pub mod panic;
 
-use kernel::mem::page_alloc::*;
-use core::sync::atomic::*;
-use lib::isr;
-
-static TIMER_COUNTER: AtomicU64 = AtomicU64::new(0);
- 
-isr! {
-    fn apic_timer_handler() {
-        TIMER_COUNTER.fetch_add(1, Ordering::Relaxed);
-    }
-}
 
 #[no_mangle]
 pub extern "C" fn kernel_main() -> ! {
     kernel::mem::setup_memory();
     kernel::idt::setup_idt();
+    
+//    kernel::apic::setup_apic().expect("failed to setup apic");
+//  debug_assert!(kernel::apic::APIC.lock().is_available());
 
-    kernel::apic::setup_apic().expect("failed to setup apic");
-    debug_assert!(kernel::apic::APIC.lock().is_available());
+    unsafe { disable_interrupts!() };
 
-    early_kprintln!("{:?}", &kernel_main as *const _);
+    early_kprintln!("setup finished, looping");
 
     loop {
         unsafe { asm!("hlt" :::: "volatile" ) };
+    }
+}
+
+
+/*
+isr! {
+    fn apic_timer_handler() {
+        TIMER_COUNTER.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -58,4 +62,4 @@ fn apic_test() {
         apic.set_spurious_interrupt(0b1100000000 | 201).unwrap();
     };
 }
-
+*/

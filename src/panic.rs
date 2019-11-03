@@ -1,5 +1,6 @@
 use core::panic::PanicInfo;
 
+#[cold]
 #[panic_handler]
 pub fn panic(info: &PanicInfo) -> ! {
     early_kprintln!("\x1B\x74----- [PANIC START HERE] -----");

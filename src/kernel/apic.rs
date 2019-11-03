@@ -2,7 +2,7 @@ use lib::*;
 use lib::sync::*;
 use core::ptr::*;
 
-pub static APIC: Mutex<APICRegisters> = Mutex::new(APICRegisters { base_addr: None });
+pub static APIC: Spinlock<APICRegisters> = Spinlock::new(APICRegisters { base_addr: None });
 pub type Result<T> = core::result::Result<T, ()>;
 
 macro_rules! set_registers {

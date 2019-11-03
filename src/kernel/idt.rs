@@ -2,7 +2,7 @@ use crate::kernel::table::idt::{Flags, InterruptDescriptorTable as IDT};
 use lib::sync::*;
 use lib::*;
 
-pub static GLOBAL_IDT: Mutex<IDT> = Mutex::new(IDT::new());
+pub static GLOBAL_IDT: Spinlock<IDT> = Spinlock::new(IDT::new());
 
 macro_rules! print_interrupt {
     ($idt:ident, $name:ident, $vector:expr) => {
@@ -62,6 +62,8 @@ pub fn setup_idt() {
     print_interrupt!(idt, int29, 29);
     print_interrupt!(idt, int30, 30);
     print_interrupt!(idt, int31, 31);
+
+    early_kprintln!("{:#?}", &int8 as *const _);
     
     unsafe {
         idt.load();

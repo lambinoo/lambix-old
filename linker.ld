@@ -3,6 +3,7 @@ ENTRY(_start)
 SECTIONS {
     . = 1M;
     kernel_start_addr = .;
+
     .multiboot2 : {
         KEEP(*(.multiboot2))
     }
@@ -12,11 +13,16 @@ SECTIONS {
     }
 
     .data : {
-        *(data.rel.ro .data.rel.ro.*)
+        *(.data, .data.*)
+        *(.data.rel.ro .data.rel.ro.*)
+    }
+
+    .rodata : {
+        *(.rodata, .rodata.*)
     }
 
     .bss : {
-        *(.bss)
+        *(.bss, .bss.*)
         *(.stack)
     }
 
@@ -24,6 +30,7 @@ SECTIONS {
         *(.text32 .text32.*)
         *(.text .text.*)
     }
+
     kernel_end_addr = .;
 }
 

@@ -1,7 +1,9 @@
-pub mod page_alloc;
+pub mod paging;
 pub mod addr;
+pub mod alloc;
 
 pub fn setup_memory() {
-    page_alloc::init_page_alloc();
+    paging::init();
+    alloc::init();
 }
 

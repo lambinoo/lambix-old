@@ -2,51 +2,50 @@ use core::sync::atomic::*;
 use core::cell::UnsafeCell;
 use core::ops::*;
 
-pub struct MutexGuard<'m, T> {
-    mutex: &'m Mutex<T>
+pub struct SpinlockGuard<'m, T> {
+    lock: &'m Spinlock<T>
 }
 
-impl<'m, T> Drop for MutexGuard<'m, T> {
+impl<'m, T> Drop for SpinlockGuard<'m, T> {
     fn drop(&mut self) {
-        self.mutex.locked.store(false, Ordering::Release);
+        self.lock.locked.store(false, Ordering::Release);
     }
 }
 
-impl<'m, T> Deref for MutexGuard<'m, T> {
+impl<'m, T> Deref for SpinlockGuard<'m, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.mutex.data.get() }
+        unsafe { &*self.lock.data.get() }
     }
 }
 
-impl<'m, T> DerefMut for MutexGuard<'m, T> {
+impl<'m, T> DerefMut for SpinlockGuard<'m, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.mutex.data.get() }
+        unsafe { &mut *self.lock.data.get() }
     }
 }
 
 
-pub struct Mutex<T> {
+pub struct Spinlock<T> {
     data: UnsafeCell<T>,
     locked: AtomicBool
 }
 
-impl<T> Mutex<T> {
-    #[deprecated(note = "very very naive implementation")]
-    pub const fn new(data: T) -> Mutex<T> {
-        Mutex { locked: AtomicBool::new(false), data: UnsafeCell::new(data) }
+impl<T> Spinlock<T> {
+    pub const fn new(data: T) -> Spinlock<T> {
+        Spinlock { locked: AtomicBool::new(false), data: UnsafeCell::new(data) }
     }
 
-    pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+    pub fn try_lock(&self) -> Option<SpinlockGuard<T>> {
         let (current, new) = (false, true);
         if self.locked.compare_and_swap(current, new, Ordering::Acquire) == current {
-            Some(MutexGuard { mutex: self })
+            Some(SpinlockGuard { lock: self })
         } else {
             None
         }
     }
 
-    pub fn lock(&self) -> MutexGuard<T> {
+    pub fn lock(&self) -> SpinlockGuard<T> {
         loop {
             if let Some(guard) = self.try_lock() {
                 return guard;
@@ -55,4 +54,4 @@ impl<T> Mutex<T> {
     }
 }
 
-unsafe impl<T> Sync for Mutex<T> {}
+unsafe impl<T> Sync for Spinlock<T> {}

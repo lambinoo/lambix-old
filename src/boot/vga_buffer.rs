@@ -7,9 +7,9 @@ pub use buffer::CharacterBuffer;
 pub use character::Character;
 
 use core::fmt::{Arguments, Write, self};
-use lib::sync::Mutex;
+use lib::sync::Spinlock;
 
-static VGA_BUFFER: Mutex<VGABuffer> = unsafe { Mutex::new(VGABuffer::new(VGA_BUFFER_ADDR as _)) };
+static VGA_BUFFER: Spinlock<VGABuffer> = unsafe { Spinlock::new(VGABuffer::new(VGA_BUFFER_ADDR as _)) };
 
 pub fn _try_print(args: Arguments) -> fmt::Result {
     VGA_BUFFER.lock().write_fmt(args)

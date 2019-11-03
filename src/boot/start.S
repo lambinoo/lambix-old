@@ -3,7 +3,6 @@ default rel
 global _start
 global multiboot_header_addr
 extern kernel_main
-extern KERNEL_VIRTUAL_START
 extern kernel_start_addr
 
 section .multiboot2  align=32
@@ -109,7 +108,7 @@ _start:
 init_paging:
     ; enabling PAE
     mov eax, cr4
-    or eax, 1 << 5
+    or eax, 1 << 5 | 1 << 7
     mov cr4, eax
 
     ; we will map the first GB of memory here, so we only need
@@ -128,7 +127,7 @@ init_paging:
 .loop:
     mov eax, ecx
     shl eax, 21
-    or eax, 0b11 | (1 << 7); PAT + write + present
+    or eax, 0b11 | (1 << 7); PAGE_SIZE + READ_WRITE + PRESENT
 
     mov [pde_table_first_gb + 8 * ecx], eax 
 
@@ -143,7 +142,8 @@ init_paging:
     ; enable long mode
     mov ecx, 0xc0000080 ; EFER address
     rdmsr
-    or eax, 1 << 8
+    or eax, 1 << 8 ; Long mode enable
+    or eax, 1 << 11 ; no execute enable
     wrmsr
    
     ; enable paging (and activate long mode)
@@ -183,54 +183,4 @@ bits 64
 ; 64 bits entry points
 _start64:
 	jmp kernel_main
-
-	;;; TODO
-	;;; DEAD CODE, kernel relocation
-
-	; we are on, let's setup the kernel virtual address space
-	mov rax, [KERNEL_VIRTUAL_START]
-
-	mov rdx, kernel_start_addr
-	mov rcx, 0
-	.loop:
-		mov rbx, rdx
-		or rbx, 0b11 | (1 << 7)
-		mov [pde_early_kernel_space + 8 * rcx], rbx
-		add rdx, 0x100000
-		inc rcx
-		cmp rcx, 512
-		jne .loop	
-
-	mov rbx, pde_early_kernel_space
-	or rbx, 0b11
-	mov rcx, rax
-	shr rcx, 30
-	and rcx, 0x1ff
-	mov [pdpe_early_kernel_space + 8 * rcx], rbx
-
-	mov rbx, pdpe_early_kernel_space
-	or rbx, 0b11 ; write + present
-	mov rcx, rax
-	shr rcx, 39
-	and rcx, 0x1ff
-	mov [pml4e_table + 8 * rcx], rbx
-
-        ; reload pml4e table (delete cache from TLB)
-	mov rax, pml4e_table
-	mov cr3, rax
-
-	; compute new kernel_main address
-	mov rax, kernel_main
-	add rax, [KERNEL_VIRTUAL_START] 
-	sub rax, kernel_start_addr
-
-	; reset stack before jumping to rust code <3
-	xor rbp, rbp
-	mov rsp, stack_start
-
-	; jump to newly mapped kernel_main
-jump_to_mapped_kernel:
-	jmp kernel_main
-
-
 

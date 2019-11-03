@@ -9,7 +9,7 @@ macro_rules! io_write_port {
 macro_rules! io_read_port {
     (u8, $port:expr) => {
         let result: u8;
-        asm!("in %dx, %al" : "={al}"($result) : "{dx}"($port));
+        asm!("in %dx, %al" : "={al}"($result) : "{dx}"($port) :: "volatile");
         result
     }; 
 }

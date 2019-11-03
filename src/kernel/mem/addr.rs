@@ -47,13 +47,22 @@ macro_rules! address {
             pub fn wrapping_add(&self, value: usize) -> Self {
                 Self(self.0.wrapping_add(value))
             }
-        }
 
-        impl Deref for $name {
-            type Target = *const $type;
+            pub fn is_null(&self) -> bool {
+                Self::NULL.0 == self.0
+            }
 
-            fn deref(&self) -> &Self::Target {
-                &self.0
+            pub fn is_aligned(&self, align: usize) -> bool {
+                let addr = usize::from(*self);
+                (addr & (align - 1)) == 0
+            }
+
+            pub fn as_ptr(self) -> *const u8 {
+                self.0
+            }
+
+            pub fn as_mut(self) -> *mut u8 {
+                self.0 as _
             }
         }
 
@@ -80,6 +89,17 @@ macro_rules! address {
                 addr.0 as usize
             }
         }
+
+        impl $name {
+            pub unsafe fn to_ref<'a, T>(self) -> &'a T {
+                &*(self.0 as *mut T)
+            }
+
+            pub unsafe fn to_ref_mut<'a, T>(self) -> &'a mut T {
+                &mut *(self.0 as *mut T)
+            }
+        }
+
 
         op!($name, BitOr, BitOrAssign, bitor, bitor_assign);
         op!($name, BitAnd, BitAndAssign, bitand, bitand_assign);
