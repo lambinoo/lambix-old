@@ -18,7 +18,7 @@ start:
 end:
 
 ;-----------------------
-section .init.stack nobits align=32
+section .init.stack nobits align=4096
 stack_end:
     resb 4096
 stack_start:

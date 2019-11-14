@@ -1,6 +1,7 @@
 use crate::kernel::mem::addr::*;
 use crate::boot::multiboot::*;
 use core::mem::size_of;
+use core::convert::TryFrom;
 use core::ops::Index;
 use core::fmt;
 
@@ -14,14 +15,18 @@ pub struct MemoryMap {
 
 impl MemoryMap {
     pub fn len(&self) -> usize {
-        let mut total_size = self.tag.size as usize;
+        let mut total_size = usize::try_from(self.tag.size).unwrap() ;
         total_size = total_size.wrapping_sub(size_of::<MemoryMap>());
-        total_size /= self.entry_size as usize;
+        total_size /= usize::try_from(self.entry_size).unwrap();
         total_size
     }
 
     pub fn entries(&self) -> MemoryEntries {
-        MemoryEntries { index: 0, memory_map: self }
+        MemoryEntries {
+            index: 0,
+            memory_map: self,
+            bytes_read: size_of::<MemoryMap>()
+        }
     }
 }
 
@@ -30,8 +35,10 @@ impl Index<usize> for MemoryMap {
 
     fn index(&self, index: usize) -> &Self::Output {
         if index < self.len() {
-            let ptr = (self as *const MemoryMap).wrapping_add(1) as *const u8;
-            unsafe { &*(ptr.wrapping_add(index * (self.entry_size as usize)) as *const Memory) }
+            let ptr = VirtAddr::from(self).wrapping_add(size_of::<MemoryMap>());
+            unsafe {
+                ptr.wrapping_add(index * usize::try_from(self.entry_size).unwrap()).to_ref()
+            }
         } else {
             panic!("trying to get not existing memory");
         }
@@ -41,6 +48,7 @@ impl Index<usize> for MemoryMap {
 
 pub struct MemoryEntries<'m> {
     index: usize,
+    bytes_read: usize,
     memory_map: &'m MemoryMap
 }
 
@@ -49,9 +57,10 @@ impl<'m> Iterator for MemoryEntries<'m> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.memory_map.len() {
-            let result = Some(&self.memory_map[self.index]);
-            self.index += 1;
-            result
+            let memory = &self.memory_map[self.index];
+            self.bytes_read += usize::try_from(self.memory_map.entry_size).unwrap();
+            self.index += 1;  
+            Some(memory)
         } else {
             None
         }

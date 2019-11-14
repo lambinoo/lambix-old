@@ -24,7 +24,7 @@ LINKER_SCRIPT = linker.ld
 KERNEL = target/$(TARGET_TRIPLE)/$(PROFILE)/$(KERNEL_NAME)
 
 # debug
-QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log
+QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log -m 4G
 
 ifeq ($(PROFILE),release)
     CARGO_FLAGS = --release

@@ -1,3 +1,4 @@
+use core::alloc::GlobalAlloc;
 use core::ops::Range;
 use core::convert::TryFrom;
 use crate::boot::multiboot::*;
@@ -28,9 +29,21 @@ impl PageAllocator for EarlyAllocator {
 
         allocator.as_mut().unwrap().alloc()
     }
+
+    fn total_memory() -> usize {
+        let mut allocator = EARLY_ALLOCATOR.inner.lock();
+        if allocator.is_none() {
+            *allocator = Some(InnerAllocator::new());
+        }
+
+        allocator.as_mut().unwrap()
+            .mem_sections.iter()
+            .fold(0, |acc, r| acc + r.start.distance(r.end))
+   }
 }
 
 
+#[derive(Debug)]
 struct InnerAllocator {
     next_page: PhyAddr,
     current_section: usize,
@@ -50,12 +63,12 @@ impl InnerAllocator {
             if current_section.contains(&self.next_page) && current_section.contains(&end_page) {
                 if !self.kernel.contains(&self.next_page) && !self.kernel.contains(&end_page) {
                     allocated_page = Ok(EarlyAllocatorPage::new(self.next_page));
-                    self.next_page = end_page;
                 }
+                self.next_page = end_page;
             } else {
                 self.current_section += 1;
-                if self.current_section <= self.mem_sections.len() {
-                    self.next_page = current_section.start;
+                if self.current_section < self.mem_sections.len() {
+                    self.next_page = self.mem_sections[self.current_section].start;
                 } else {
                     break;
                 }
@@ -66,12 +79,9 @@ impl InnerAllocator {
     }
 
     unsafe fn init(&mut self) {
-        let mem_map = BOOT_INFO.tags()
-            .filter(|t| t.tag_type == TagType::MemMap)
-            .next().unwrap().as_memmap().unwrap();
-
-        let mut ram_entries = mem_map
-            .entries()
+        let mut ram_entries = BOOT_INFO.tags()
+            .filter_map(|t| t.as_memmap())
+            .flat_map(|m| m.entries())
             .filter(|m| m.mem_type == memmap::MemoryType::AvailableRAM);
 
         for section in self.mem_sections.iter_mut() {
@@ -84,11 +94,13 @@ impl InnerAllocator {
                     entry.base_addr.wrapping_add(usize::try_from(entry.length).unwrap())
                     & !(Self::PAGE_SIZE - 1);
 
+                early_kprintln!("{:?}", base_addr..end_addr);
+
                 base_addr .. end_addr
             } else {
                 PhyAddr::NULL .. PhyAddr::NULL
             };
-        }
+        }        
 
         if !self.mem_sections[0].is_empty() {
             self.next_page = self.mem_sections[0].start;
@@ -139,3 +151,4 @@ impl MemoryPage for EarlyAllocatorPage {
         Some(Self::new(paddr))
     }
 }
+

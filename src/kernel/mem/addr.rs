@@ -1,15 +1,9 @@
 use core::ops::*;
+use core::mem::align_of;
+use super::mem
 
 macro_rules! op {
     ($name:ident, $tr:ident, $trass:ident, $fn_name:ident, $fnass_name:ident) => {
-        impl $tr<u64> for $name {
-            type Output = Self;
-            fn $fn_name(self, rhs: u64) -> Self::Output {
-                let a = (self.0 as u64).$fn_name(rhs);
-                Self(a as _)
-            }
-        }
-
         impl $tr<usize> for $name {
             type Output = Self;
             fn $fn_name(self, rhs: usize) -> Self::Output {
@@ -17,21 +11,13 @@ macro_rules! op {
                 Self(a as _)
             }
         }
-
-        impl $trass<u64> for $name {
-            fn $fnass_name(&mut self, rhs: u64) {
-                let result = (*self).$fn_name(rhs);
-                self.0 = result.0 as _;
-            }
-        }
-
+ 
         impl $trass<usize> for $name {
             fn $fnass_name(&mut self, rhs: usize) {
                 let result = (*self).$fn_name(rhs);
                 self.0 = result.0 as _;
             }
         }
-
     }
 }
 
@@ -45,7 +31,11 @@ macro_rules! address {
             pub const NULL: $name = $name(0 as _);
 
             pub fn wrapping_add(&self, value: usize) -> Self {
-                Self(self.0.wrapping_add(value))
+                $name(self.0.wrapping_add(value))
+            }
+
+            pub fn align<T>(&self) -> $name {
+                self.wrapping_add(self.0.align_offset(align_of::<T>()))
             }
 
             pub fn is_null(&self) -> bool {
@@ -66,21 +56,15 @@ macro_rules! address {
             }
         }
 
-        impl From<u64> for $name {
-            fn from(addr: u64) -> $name {
-                $name(addr as _)
+        impl<T> From<&T> for $name {
+            fn from(addr: &T) -> $name {
+                $name(addr as *const T as _)
             }
         }
-
+  
         impl From<usize> for $name {
             fn from(addr: usize) -> $name {
                 $name(addr as _)
-            }
-        }
-
-        impl From<$name> for u64 {
-            fn from(addr: $name) -> u64 {
-                addr.0 as _
             }
         }
 
@@ -91,6 +75,17 @@ macro_rules! address {
         }
 
         impl $name {
+            pub fn distance(&self, end: $name) -> usize {
+                let end = usize::from(end);
+                let start = usize::from(*self);
+
+                if end > start {
+                    end.wrapping_sub(start)
+                } else {
+                    0
+                }
+            }
+
             pub unsafe fn to_ref<'a, T>(self) -> &'a T {
                 &*(self.0 as *mut T)
             }
@@ -99,7 +94,6 @@ macro_rules! address {
                 &mut *(self.0 as *mut T)
             }
         }
-
 
         op!($name, BitOr, BitOrAssign, bitor, bitor_assign);
         op!($name, BitAnd, BitAndAssign, bitand, bitand_assign);
@@ -110,4 +104,10 @@ macro_rules! address {
 
 address!(PhyAddr; u8);
 address!(VirtAddr; u8);
+
+impl VirtAddr {
+    pub fn get_paddr(&self) -> Option<PhyAddr> {
+        
+    }
+}
 

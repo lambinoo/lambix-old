@@ -1,5 +1,7 @@
 pub mod memmap;
 
+use crate::kernel::mem::addr::*;
+use core::convert::TryFrom;
 use core::mem::size_of;
 use memmap::*;
 
@@ -13,18 +15,13 @@ pub struct BootInfo;
 
 impl BootInfo {
     #[inline]
-    fn ptr(&self) -> *const InfoHeader {
-        unsafe { (multiboot_header_addr as u64) as _ }
-    }
-
-    #[inline]
-    fn header(&self) -> &InfoHeader {
-        unsafe { &*self.ptr() }
+    fn vaddr(&self) -> VirtAddr {
+        unsafe { VirtAddr::from(usize::try_from(multiboot_header_addr).unwrap()) }
     }
 
     pub fn tags(&self) -> Tags {
         Tags {
-            current_tag: self.ptr().wrapping_add(1) as _,
+            current_tag: self.vaddr().wrapping_add(size_of::<InfoHeader>()),
             _phantom: core::marker::PhantomData
         }
     }
@@ -32,7 +29,7 @@ impl BootInfo {
 
 
 pub struct Tags<'t> {
-    current_tag: *const u8,
+    current_tag: VirtAddr,
     _phantom: core::marker::PhantomData<&'t Tag>
 }
 
@@ -42,12 +39,10 @@ impl<'t> Iterator for Tags<'t> {
     fn next(&mut self) -> Option<Self::Item> {
         let current_tag = self.get_current_tag();
         match current_tag.tag_type {
-            TagType::EndTag => {
-                Some(self.get_current_tag())
-            },
+            TagType::EndTag => None,
             _  => {
                 self.next_tag();
-                Some(self.get_current_tag())
+                Some(current_tag)
             }
         }
     }
@@ -56,15 +51,13 @@ impl<'t> Iterator for Tags<'t> {
 impl<'t> Tags<'t> {
     #[inline]
     fn get_current_tag(&self) -> &'t Tag {
-        unsafe { &*(self.current_tag as *const Tag) }
+        unsafe { self.current_tag.to_ref() }
     }
 
     pub fn next_tag(&mut self) {
-        let size = self.get_current_tag().size as usize;
+        let size = usize::try_from(self.get_current_tag().size).unwrap();
         let unaligned_ptr = self.current_tag.wrapping_add(size);
-        self.current_tag = unaligned_ptr.wrapping_add(
-            unaligned_ptr.align_offset(size_of::<Tag>())
-        );
+        self.current_tag = unaligned_ptr.align_next::<Tag>(); 
     }
 }
 
@@ -84,7 +77,7 @@ pub struct Tag {
 
 impl Tag {
     fn payload<T>(&self) -> &T {
-        unsafe { &*(self as *const Tag as *const _) }
+        unsafe { VirtAddr::from(self).to_ref() }
     }
 
     pub fn as_memmap(&self) -> Option<&MemoryMap> {

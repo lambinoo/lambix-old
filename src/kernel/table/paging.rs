@@ -15,7 +15,7 @@ macro_rules! table {
 
         impl $name {
             pub const fn new() -> Self {
-                let table = unsafe { transmute([0u64; 512]) };
+                let table = unsafe { transmute([0usize; 512]) };
                 Self { table }
             }
 
@@ -69,23 +69,23 @@ impl Entry<PageDirectoryTable> {
 #[repr(transparent)]
 #[derive(Default)]
 pub struct Entry<T> {
-    value: AtomicU64,
+    value: AtomicUsize,
     phantom: core::marker::PhantomData<T>
 }
 
 impl<T> Entry<T> {
     fn new() -> Entry<T> {
         Entry {
-            value: AtomicU64::new(0),
+            value: AtomicUsize::new(0),
             phantom: core::marker::PhantomData
         }
     }
 
-    pub fn get_value(&self) -> u64 {
+    pub fn get_value(&self) -> usize {
         self.value.load(Ordering::Acquire)
     }
 
-    pub fn set_value(&self, value: u64) {
+    pub fn set_value(&self, value: usize) {
         self.value.store(value, Ordering::Relaxed);
     }
 
@@ -107,7 +107,7 @@ impl<T> Entry<T> {
 
 bitflags! {
     #[derive(Default)]
-    pub struct Flags : u64 { 
+    pub struct Flags : usize { 
         const NO_EXECUTE = 1 << 63;
         const PAGE_ATTR = 1 << 12;
         const GLOBAL = 1 << 8;

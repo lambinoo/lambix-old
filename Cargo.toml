@@ -14,9 +14,12 @@ sha1 = "0.6"
 [profile.dev]
 panic = 'abort'
 incremental = true
+opt-level=1
+lto = true
 
 [profile.release]
 panic = 'abort'
 incremental = true
 debug = true
+lto = true
 
