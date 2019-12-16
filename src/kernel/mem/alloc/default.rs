@@ -1,10 +1,11 @@
 use core::alloc::{Layout, GlobalAlloc};
-use crate::kernel::mem::addr::*;
-use crate::kernel::config::*;
 use core::ops::Range;
 use core::ptr::NonNull;
 use lib::sync::*;
-use super::{
+
+use crate::kernel::mem::addr::*;
+use crate::kernel::config::*;
+use crate::kernel::mem::paging::{
     PageAllocator,
     PageAllocatorError,
     MemoryPage,

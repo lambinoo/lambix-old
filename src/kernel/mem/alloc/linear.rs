@@ -1,15 +1,17 @@
 use core::alloc::GlobalAlloc;
 use core::ops::Range;
 use core::convert::TryFrom;
+use crate::kernel::mem::addr::*;
 use crate::boot::multiboot::*;
 use crate::kernel::mem::addr::*;
-use super::{PageAllocator, PageAllocatorError, MemoryPage};
+use crate::kernel::paging::{PageAllocator, PageAllocatorError, MemoryPage};
 use lib::sync::*;
 
 extern {
     static kernel_start_addr: u8;
     static kernel_end_addr: u8; 
 }
+
 
 static EARLY_ALLOCATOR: EarlyAllocator = EarlyAllocator {
     inner: Spinlock::new(None)
@@ -19,43 +21,33 @@ pub struct EarlyAllocator {
     inner: Spinlock<Option<InnerAllocator>>
 }
 
-impl PageAllocator for EarlyAllocator {
-    type Page = EarlyAllocatorPage;
-    fn allocate() -> Result<Self::Page, PageAllocatorError> {
+impl GlobalAlloc for EarlyAllocator {
+    fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut allocator = EARLY_ALLOCATOR.inner.lock();
         if allocator.is_none() {
             *allocator = Some(InnerAllocator::new());
         }
 
-        allocator.as_mut().unwrap().alloc()
+        allocator.as_mut().unwrap().alloc(layout)
     }
 
-    fn total_memory() -> usize {
-        let mut allocator = EARLY_ALLOCATOR.inner.lock();
-        if allocator.is_none() {
-            *allocator = Some(InnerAllocator::new());
-        }
-
-        allocator.as_mut().unwrap()
-            .mem_sections.iter()
-            .fold(0, |acc, r| acc + r.start.distance(r.end))
-   }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // no-op
+    }
 }
 
 
 #[derive(Debug)]
 struct InnerAllocator {
-    next_page: PhyAddr,
+    next_addr: VirtAddr,
     current_section: usize,
     mem_sections: [Range<PhyAddr>; 32],
     kernel: Range<PhyAddr>
 }
 
 impl InnerAllocator {
-    const PAGE_SIZE: usize = EarlyAllocatorPage::PAGE_SIZE;
-
-    fn alloc(&mut self) -> Result<EarlyAllocatorPage, PageAllocatorError> {
-        let mut allocated_page = Err(PageAllocatorError::OutOfMemory);
+    fn alloc(&mut self) -> VirtAddr {
+        let mut allocated_page = VirtAddr::NULL;
         while allocated_page.is_err() {
             let current_section = &self.mem_sections[self.current_section];
             let end_page = self.next_page.wrapping_add(Self::PAGE_SIZE);

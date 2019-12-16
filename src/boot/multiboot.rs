@@ -57,7 +57,7 @@ impl<'t> Tags<'t> {
     pub fn next_tag(&mut self) {
         let size = usize::try_from(self.get_current_tag().size).unwrap();
         let unaligned_ptr = self.current_tag.wrapping_add(size);
-        self.current_tag = unaligned_ptr.align_next::<Tag>(); 
+        self.current_tag = unaligned_ptr.align::<Tag>(); 
     }
 }
 
