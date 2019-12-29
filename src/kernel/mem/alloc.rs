@@ -70,7 +70,6 @@ impl LambixAllocator {
             }
 
             self.inner.lock().as_mut().unwrap().memory.end = end_addr;
-            early_kprintln!("DONE\n{:?}", self.inner.lock().as_ref());
         };
 
     }

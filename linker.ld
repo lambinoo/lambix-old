@@ -2,9 +2,10 @@ ENTRY(_start)
 
 SECTIONS {
     . = 1M;
+    . = ALIGN(4096);
     kernel_start_addr = .;
 
-    .multiboot2 : {
+    .multiboot2 :  {
         KEEP(*(.multiboot2))
     }
 
@@ -18,15 +19,19 @@ SECTIONS {
     }
 
     .bss : {
+        *(COMMON)
         *(.bss, .bss.*)
-        *(.init, .init.*)
     }
 
     .text : {
-        *(.text32 .text32.*)
         *(.text .text.*)
     }
 
+    .text32 : {
+        *(.text32 .text32.*)
+    }
+
+    . = ALIGN(4096);
     kernel_end_addr = .;
 }
 

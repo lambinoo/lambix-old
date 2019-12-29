@@ -63,8 +63,6 @@ pub fn setup_idt() {
     print_interrupt!(idt, int30, 30);
     print_interrupt!(idt, int31, 31);
 
-    early_kprintln!("{:#?}", &int8 as *const _);
-    
     unsafe {
         idt.load();
         enable_interrupts!();

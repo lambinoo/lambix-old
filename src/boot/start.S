@@ -2,8 +2,7 @@ default rel
 
 global _start
 global multiboot_header_addr
-extern kernel_main
-extern kernel_start_addr
+extern kernel_bootstrap
 
 section .multiboot2  align=32
 start:
@@ -18,13 +17,13 @@ start:
 end:
 
 ;-----------------------
-section .init.stack nobits align=4096
+section .bss.init.stack nobits align=4096
 stack_end:
     resb 4096
 stack_start:
 
 ;-----------------------
-section .init.paging nobits align=4096
+section .bss.init.paging nobits align=4096
 pml4e_table:
     resb 4096
 pdpe_table_first_gb:
@@ -37,7 +36,7 @@ pde_early_kernel_space:
     resb 4096
 
 ;-----------------------
-section .init.gdt_table align=4096
+section .bss.init.gdt_table align=4096
 gdt_table:
     .null:
         dq 0
@@ -182,5 +181,5 @@ section .text align=64
 bits 64
 ; 64 bits entry points
 _start64:
-	jmp kernel_main
+	jmp kernel_bootstrap
 
