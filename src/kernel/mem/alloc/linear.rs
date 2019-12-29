@@ -7,10 +7,7 @@ use crate::kernel::mem::addr::*;
 use crate::kernel::paging::{PageAllocator, PageAllocatorError, MemoryPage};
 use lib::sync::*;
 
-extern {
-    static kernel_start_addr: u8;
-    static kernel_end_addr: u8; 
-}
+
 
 
 static EARLY_ALLOCATOR: EarlyAllocator = EarlyAllocator {

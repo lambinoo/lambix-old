@@ -37,6 +37,10 @@ macro_rules! address {
                 self.wrapping_add(self.0.align_offset(align_of::<T>()))
             }
 
+            pub fn align_to(&self, value: usize) -> $name {
+                self.wrapping_add(self.0.align_offset(value))
+            }
+
             pub fn is_null(&self) -> bool {
                 Self::NULL.0 == self.0
             }
@@ -103,10 +107,4 @@ macro_rules! address {
 
 address!(PhyAddr; u8);
 address!(VirtAddr; u8);
-
-impl VirtAddr {
-    pub fn get_paddr(&self) -> Option<PhyAddr> {
-        
-    }
-}
 

@@ -8,10 +8,6 @@ SECTIONS {
         KEEP(*(.multiboot2))
     }
 
-    .bootdata : {
-        *(.bootdata, .bootdata.*)
-    }
-
     .data : {
         *(.data, .data.*)
         *(.data.rel.ro .data.rel.ro.*)
@@ -23,7 +19,7 @@ SECTIONS {
 
     .bss : {
         *(.bss, .bss.*)
-        *(.stack)
+        *(.init, .init.*)
     }
 
     .text : {

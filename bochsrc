@@ -9,5 +9,5 @@ mouse: enabled=0
 clock: sync=realtime
 cpu: ips=70000000
 debug_symbols: file=build/symbols
-
+magic_break: enabled=1
 

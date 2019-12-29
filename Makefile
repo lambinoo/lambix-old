@@ -22,6 +22,7 @@ endif
 BUILD_DIR = build
 LINKER_SCRIPT = linker.ld
 KERNEL = target/$(TARGET_TRIPLE)/$(PROFILE)/$(KERNEL_NAME)
+KERNEL_ISO = $(BUILD_DIR)/isodir/boot/$(KERNEL_NAME)
 
 # debug
 QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log -m 4G
@@ -32,7 +33,7 @@ endif
 
 build-iso: build symbols
 	mkdir -p $(BUILD_DIR)/isodir/boot/grub
-	cp $(KERNEL) $(BUILD_DIR)/isodir/boot/$(KERNEL_NAME)
+	cp $(KERNEL) $(KERNEL_ISO) 
 	cp $(BUILD_DIR)/grub.cfg $(BUILD_DIR)/isodir/boot/grub
 	$(GRUB_MKRESCUE) -o $(BUILD_DIR)/$(KERNEL_NAME).iso $(BUILD_DIR)/isodir 2> $(BUILD_DIR)/grub_mkrescue.log 
 
@@ -60,7 +61,7 @@ rebuild: clean build
 debug:
 	$(GDB) \
 		-ex "target remote | $(QEMU) $(QEMU_FLAGS) -S -gdb stdio -monitor pty" \
-		-ex "symbol-file $(KERNEL)" \
+		-ex "symbol-file $(KERNEL_ISO)" \
 
 run:
 	$(QEMU) $(QEMU_FLAGS) -monitor stdio -S

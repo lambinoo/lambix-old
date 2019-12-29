@@ -14,8 +14,8 @@
         "gcc": [
             "-z,noexecstack",
             "-Tlinker.ld",
-	    "-nostdlib",
-	    "-ffreestanding"
+	        "-nostdlib",
+    	    "-ffreestanding"
         ]    
     },
     "features": "-sse,-mmx,+soft-float",

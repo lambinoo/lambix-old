@@ -2,6 +2,7 @@ pub mod memmap;
 
 use crate::kernel::mem::addr::*;
 use core::convert::TryFrom;
+use core::ops::Range;
 use core::mem::size_of;
 use memmap::*;
 
@@ -14,20 +15,30 @@ extern {
 pub struct BootInfo;
 
 impl BootInfo {
-    #[inline]
-    fn vaddr(&self) -> VirtAddr {
-        unsafe { VirtAddr::from(usize::try_from(multiboot_header_addr).unwrap()) }
+    pub fn paddr(&self) -> PhyAddr {
+        unsafe { PhyAddr::from(usize::try_from(multiboot_header_addr).unwrap()) }
     }
 
-    pub fn tags(&self) -> Tags {
+    pub fn range(&self) -> Range<PhyAddr> {
+        unsafe {
+            let total_size = usize::try_from(
+                self.paddr().to_ref::<InfoHeader>().total_size
+            ).unwrap();
+
+            self.paddr() .. self.paddr().wrapping_add(total_size)
+        }
+    }
+
+    /// Get the tags from the boot information at this address
+    pub unsafe fn tags(&self, vaddr: VirtAddr) -> Tags {
         Tags {
-            current_tag: self.vaddr().wrapping_add(size_of::<InfoHeader>()),
+            current_tag: vaddr.wrapping_add(size_of::<InfoHeader>()),
             _phantom: core::marker::PhantomData
         }
     }
 }
 
-
+#[derive(Copy, Clone)]
 pub struct Tags<'t> {
     current_tag: VirtAddr,
     _phantom: core::marker::PhantomData<&'t Tag>
@@ -56,19 +67,19 @@ impl<'t> Tags<'t> {
 
     pub fn next_tag(&mut self) {
         let size = usize::try_from(self.get_current_tag().size).unwrap();
-        let unaligned_ptr = self.current_tag.wrapping_add(size);
-        self.current_tag = unaligned_ptr.align::<Tag>(); 
+        let unaligned_ptr = self.current_tag.wrapping_add(size); 
+        self.current_tag = unaligned_ptr.align::<u64>();
     }
 }
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct InfoHeader {
-    max_size: u32,
+    total_size: u32,
     _reserved: u32
 }
 
-#[repr(C)]
 #[derive(Debug)]
 pub struct Tag {
     pub tag_type: TagType,
@@ -91,6 +102,7 @@ impl Tag {
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum TagType {
     EndTag = 0,
     BasicMemInfo = 4,

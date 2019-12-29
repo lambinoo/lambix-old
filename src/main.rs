@@ -8,12 +8,12 @@
     panic_info_message,
     const_transmute,
     range_is_empty,
-    alloc_error_handler
+    alloc_error_handler,
+    new_uninit
 )]
 
 extern crate alloc;
 use lib::*;
-use alloc::*;
 
 #[macro_use]
 pub mod boot;
@@ -23,13 +23,12 @@ pub mod panic;
 
 #[no_mangle]
 pub extern "C" fn kernel_main() -> ! {
-    kernel::mem::setup_memory();
-    kernel::idt::setup_idt();
-    
-//    kernel::apic::setup_apic().expect("failed to setup apic");
-//  debug_assert!(kernel::apic::APIC.lock().is_available());
+    unsafe {
+        disable_interrupts!();
 
-    unsafe { disable_interrupts!() };
+        kernel::mem::setup_memory();
+        kernel::idt::setup_idt();
+    }
 
     early_kprintln!("setup finished, looping");
 
