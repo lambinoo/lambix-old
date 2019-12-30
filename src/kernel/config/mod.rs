@@ -22,5 +22,8 @@ export![
     // 512GB guard hole
     PAGE_MAP_BASE = VMALLOC_END + _512GB;
     PAGE_MAP_END = PAGE_MAP_BASE + _1TB;
+    // 512GB guard hole
+    KERNEL_START = PAGE_MAP_END + _512GB;
+    KERNEL_END = KERNEL_START + _1GB / 2;
 ];
 

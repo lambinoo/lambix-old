@@ -9,7 +9,8 @@
     const_transmute,
     range_is_empty,
     alloc_error_handler,
-    new_uninit
+    new_uninit,
+    alloc_layout_extra
 )]
 
 extern crate alloc;
@@ -19,7 +20,8 @@ pub mod boot;
 pub mod kernel;
 pub mod panic;
 
-pub fn kernel_main() -> ! {
+#[no_mangle]
+pub extern "Rust" fn kernel_main() -> ! {
     early_kprintln!("kernel main reached");
     loop {}
 }

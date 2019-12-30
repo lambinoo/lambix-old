@@ -6,6 +6,7 @@ use crate::kernel::table::paging::*;
 pub use crate::kernel::table::paging::Flags;
 
 pub type Result<T> = core::result::Result<T, MapErr>;
+pub const PAGE_SIZE: usize = PageTable::PAGE_SIZE;
 
 #[derive(Copy, Clone, Debug)]
 pub enum MapErr {
@@ -60,6 +61,22 @@ pub unsafe fn map4k(vaddr: VirtAddr, paddr: PhyAddr, flags: Flags)-> Result<()> 
     }
 }
 
+pub unsafe fn unmap4k(vaddr: VirtAddr) -> Result<()> {
+    // TODO we have to free all page tables that are empty here if we can
+    // this means implementing an algorithm capable of finding the virtual address linked to the
+    // physical address of the box
+    let pt_entry = PageTable::get_entry(PageTableType::PT, vaddr);
+    if pt_entry.is_present() {
+        pt_entry.set_value(0);
+        Ok(())
+    } else {
+        Err(MapErr::NotMapped)
+    }
+}
+
+
+
+/// Allocate a page table for this entry if none exist
 unsafe fn allocate_if_not_exist(entry: &Entry) {
     if !entry.is_present() {
         let page_table = VirtAddr::from(Box::into_raw(PageTable::new()) as usize);

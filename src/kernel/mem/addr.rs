@@ -64,6 +64,19 @@ macro_rules! address {
                 $name(addr as *const T as _)
             }
         }
+
+        impl<T> From<*mut T> for $name {
+            fn from(addr: *mut T) -> $name {
+                $name(addr as *const T as _)
+            }
+        }
+        
+        impl<T> From<*const T> for $name {
+            fn from(addr: *const T) -> $name {
+                $name(addr as *const T as _)
+            }
+        }
+
   
         impl From<usize> for $name {
             fn from(addr: usize) -> $name {
