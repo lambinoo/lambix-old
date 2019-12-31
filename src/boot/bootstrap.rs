@@ -1,11 +1,13 @@
 use lib::*;
 use crate::kernel;
+use crate::kernel::idt::*;
+use crate::kernel::table::idt::*;
 use crate::kernel_main;
 use crate::kernel::mem::addr::*;
 use crate::kernel::mem::vbox::VBox;
 
 use core::convert::TryFrom;
-use alloc::string::*;
+use core::sync::atomic::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn kernel_bootstrap() -> ! {
@@ -13,47 +15,77 @@ pub unsafe extern "C" fn kernel_bootstrap() -> ! {
 
     kernel::mem::setup_memory();
     kernel::idt::setup_idt();
-
+    
     setup_apic();
-
     kernel_main();
 }
 
 #[repr(align(4096))]
 struct APICRegisters {
-    registers: [u16; 256]
+    registers: [AtomicU32; 1024]
 }
 
-impl core::fmt::Debug for APICRegisters {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut content = String::new();
 
-        for i in 0..256 {
-            let reg = self.registers[i];
-            let value = unsafe { core::ptr::read_volatile(reg as *const u16) };
-            content += &value.to_string();
-            content += ", ";
-        }
+static TIMER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-        write!(f, "APICRegisters {{ {} }}", content)
+isr! {
+    fn timer_handler() {
+        TIMER_COUNTER.fetch_add(1, Ordering::Relaxed);
     }
 }
 
 unsafe fn setup_apic() {
-    let apic_msr_reg = 0x000_001b;
+    io_write_port!(u8, 0xa1, 0xff);
+    io_write_port!(u8, 0x21, 0xff);
+    enable_interrupts!();
+
+    let apic_msr_reg = 0x1b;
     let mut apic_addr_reg = readmsr!(apic_msr_reg);
     apic_addr_reg[1] |= 1 << 11;
     writemsr!(apic_msr_reg, apic_addr_reg);
 
-    let mask: u64 = (1 << 12) - 1;
+    early_kprintln!("{:?}", apic_addr_reg);
+
+    let mask: u64 = !(0xfff | (0xfff << 52));
     let apic_base_addr = PhyAddr::from(usize::try_from(
         (u64::from(apic_addr_reg[1]) | u64::from(apic_addr_reg[0]) << 32)
-        &! (mask | (mask << 52))
+        & mask
     ).unwrap());
+    
 
     let apic: VBox<APICRegisters> = VBox::new(apic_base_addr);
-    early_kprintln!("{:?}", apic);
-    loop {}
+    GLOBAL_IDT.lock().set_handler(
+        200,
+        Flags::PRESENT | Flags::TYPE_INTERRUPT,
+        timer_handler
+    );
+    
+
+    let spurious_reg = &apic.registers[0xf0 / 4];
+    let timer_reg = &apic.registers[0x320 / 4];
+    let timer_diviser = &apic.registers[0x3E0 / 4];
+    let timer_count = &apic.registers[0x380 / 4];
+    let task_priority = &apic.registers[0x80 / 4];
+    let end_of_int = &apic.registers[0xb0 / 4];
+
+    spurious_reg.store((1 << 8) | 0xff, Ordering::SeqCst);
+    task_priority.store(0, Ordering::SeqCst);
+    timer_diviser.store(0b1011, Ordering::SeqCst);
+    timer_reg.store((1 << 17) | 200, Ordering::SeqCst);
+    timer_count.store(1, Ordering::SeqCst);
+  
+    let mut previous = 0;
+    loop {
+        let new_value = TIMER_COUNTER.load(Ordering::Relaxed);
+        if previous != new_value {
+            previous = new_value;
+            end_of_int.store(0, Ordering::SeqCst);
+
+            if new_value % 1000 == 0 {
+                early_kprintln!("{}", new_value);
+            }
+        }
+    }
 }
 
 
