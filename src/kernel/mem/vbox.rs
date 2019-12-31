@@ -4,6 +4,7 @@ use crate::kernel::mem::paging::*;
 use crate::kernel::mem::addr::*;
 use crate::kernel::config::*;
 use alloc::alloc::Layout;
+use alloc::boxed::Box;
 
 use core::ops::Range;
 use core::ptr::NonNull;
@@ -12,13 +13,13 @@ static ALLOCATOR: Spinlock<Option<VAllocator>> = Spinlock::new(None);
 
 #[derive(Debug)]
 pub struct VBox<T> {
-    base_addr: NonNull<T>,
+    inner_box: Box<T>,
     paddr: PhyAddr
 }
 
 impl<T> VBox<T> {
     pub unsafe fn new(paddr: PhyAddr) -> VBox<T> {
-        VBox::with_flags(paddr, Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE)
+        VBox::with_flags(paddr, Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH)
     }
 
     pub unsafe fn with_flags(paddr: PhyAddr, flags: Flags) -> VBox<T> {
@@ -38,11 +39,13 @@ impl<T> VBox<T> {
                 offset += PAGE_SIZE;
             }
 
+            use lib::*;
+            set_cr3!(get_cr3!()); // flush everything!
+
             VBox {
-                base_addr: NonNull::new(base_addr as *mut _).unwrap(),
+                inner_box: Box::from_raw(base_addr as *mut T),
                 paddr: paddr
             }
-
         } else {
             panic!("VBox framework wasn't initialized before use");
         }
@@ -54,15 +57,30 @@ impl<T> VBox<T> {
     }
 }
 
+impl<T> core::ops::Deref for VBox<T> {
+    type Target = Box<T>;
+    fn deref(&self) -> &Box<T> {
+        &self.inner_box
+    }
+}
+
+impl<T> core::ops::DerefMut for VBox<T> {
+    fn deref_mut(&mut self) -> &mut Box<T> {
+        &mut self.inner_box
+    }
+}
+
+
 impl<T> Drop for VBox<T> {
     fn drop(&mut self) {
+        let base_addr = self.inner_box.as_mut() as *mut T as *mut u8;
+
         unsafe {
-            unmap4k(VirtAddr::from(self.base_addr.as_ptr()))
-                .expect("unsound state, already allocated vmem not mapped");
+            unmap4k(VirtAddr::from(base_addr)).expect("unsound state, already allocated vmem not mapped");
         };
 
         if let Some(ref mut allocator) = *ALLOCATOR.lock() {
-            allocator.dealloc(Self::layout(), self.base_addr.as_ptr() as *mut _);
+            allocator.dealloc(Self::layout(), base_addr);
         }
     }
 }
