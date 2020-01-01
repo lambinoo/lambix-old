@@ -87,11 +87,8 @@ bits 32
 _start:
     cld
     cli
-
-    ; setup stack
-    xor ebp, ebp
-    mov esp, stack_start
-
+ 
+_kernel_start:
     ; check multiboot2
     mov esi, errors.no_multiboot
     cmp eax, 0x36d76289 ; multiboot2 magic number
@@ -181,5 +178,11 @@ section .text align=64
 bits 64
 ; 64 bits entry points
 _start64:
-	jmp kernel_bootstrap
+    ; setup stack
+    xor rbp, rbp
+    mov rsp, stack_start
+    push 0
+    push 0
+	call kernel_bootstrap
+    ret ; return to 0, effectively crashing
 

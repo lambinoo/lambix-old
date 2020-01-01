@@ -12,24 +12,18 @@ pub const PAGE_SIZE: usize = PageTable::PAGE_SIZE;
 pub enum MapErr {
     AlreadyMapped,
     NotMapped,
-    OutOfMemory
+    OutOfMemory,
+    Is4KMapped
 }
 
 pub unsafe fn get_physical_page(addr: VirtAddr) -> Result<PhyAddr> {
-    let mut result = Err(MapErr::NotMapped);
-
-    if PageTable::get_entry(PageTableType::PML4T, addr).is_present()
-        && PageTable::get_entry(PageTableType::PDPT, addr).is_present()
-        && PageTable::get_entry(PageTableType::PDT, addr).is_present() {
-
-        let entry = PageTable::get_entry(PageTableType::PT, addr);
-        if entry.is_present() {
-            let paddr_mask = ((1 << 52) - 1) & !((1 << 12) - 1);
-            result = Ok(PhyAddr::from(entry.get_value() & paddr_mask));
-        }
+    let entry = get_pt_entry(addr)?;
+    if entry.is_present() {
+        let paddr_mask = ((1 << 52) - 1) & !((1 << 12) - 1);
+        Ok(PhyAddr::from(entry.get_value() & paddr_mask))
+    } else {
+        Err(MapErr::NotMapped)
     }
-
-    result
 }
 
 /// Map a physical address to a virtual address.
@@ -54,7 +48,7 @@ pub unsafe fn map4k(vaddr: VirtAddr, paddr: PhyAddr, flags: Flags)-> Result<()> 
 
     let pt_entry = PageTable::get_entry(PageTableType::PT, vaddr);
     if !pt_entry.is_present() {
-        pt_entry.set(paddr, flags);
+        pt_entry.set(paddr, flags | Flags::PRESENT);
         Ok(())
     } else {
         Err(MapErr::AlreadyMapped)
@@ -65,16 +59,51 @@ pub unsafe fn unmap4k(vaddr: VirtAddr) -> Result<()> {
     // TODO we have to free all page tables that are empty here if we can
     // this means implementing an algorithm capable of finding the virtual address linked to the
     // physical address of the box
-    let pt_entry = PageTable::get_entry(PageTableType::PT, vaddr);
+    let pt_entry = get_pt_entry(vaddr)?;
     if pt_entry.is_present() {
         pt_entry.set_value(0);
+        invalidate_page(vaddr);
         Ok(())
     } else {
         Err(MapErr::NotMapped)
     }
 }
 
+pub unsafe fn unmap2m(vaddr: VirtAddr) -> Result<()> {
+    let mut result = Err(MapErr::NotMapped);
 
+    if PageTable::get_entry(PageTableType::PML4T, vaddr).is_present() 
+        && PageTable::get_entry(PageTableType::PDPT, vaddr).is_present() {
+
+        let pdt_entry = PageTable::get_entry(PageTableType::PDT, vaddr);
+        if pdt_entry.is_present() {
+            if (pdt_entry.get_value() & Flags::PAGE_SIZE.bits()) != 0 {
+                pdt_entry.set_value(0);
+                invalidate_page(vaddr);
+                result = Ok(());
+            } else{
+                result = Err(MapErr::Is4KMapped);
+            }
+        }
+    }
+
+    result
+}
+
+#[inline]
+unsafe fn invalidate_page(vaddr: VirtAddr) {
+    asm!("invlpg ($0)" :: "r"(vaddr) : "memory");
+}
+
+unsafe fn get_pt_entry<'a>(vaddr: VirtAddr) -> Result<&'a Entry> {
+    if PageTable::get_entry(PageTableType::PML4T, vaddr).is_present() 
+        && PageTable::get_entry(PageTableType::PDPT, vaddr).is_present()
+        && PageTable::get_entry(PageTableType::PDT, vaddr).is_present() {
+        Ok(PageTable::get_entry(PageTableType::PT, vaddr))
+    } else {
+        Err(MapErr::NotMapped)
+    }
+}
 
 /// Allocate a page table for this entry if none exist
 unsafe fn allocate_if_not_exist(entry: &Entry) {

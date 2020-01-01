@@ -1,8 +1,7 @@
 ENTRY(_start)
 
 SECTIONS {
-    . = 1M;
-    . = ALIGN(4096);
+    . = 2M;
     kernel_start_addr = .;
 
     .multiboot2 :  {
