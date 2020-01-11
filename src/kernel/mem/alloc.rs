@@ -2,22 +2,23 @@ use crate::kernel::config::*;
 use crate::kernel::table::paging::*;
 use crate::kernel::mem::paging::*;
 use crate::kernel::kernel_range;
-use crate::boot::multiboot::{memmap::*, *};
 use crate::kernel::mem::addr::*;
+use crate::boot::multiboot::{memmap::*, *};
 
 use core::convert::TryFrom;
+use core::ptr::NonNull;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ops::Range;
 use lib::sync::*;
 
 #[global_allocator]
-static LALLOC: LambixAllocator = LambixAllocator::new();
+pub static LALLOC: LambixAllocator = LambixAllocator::new();
 
 pub fn init() {
     LALLOC.init();
 }
 
-struct LambixAllocator {
+pub struct LambixAllocator {
     inner: Spinlock<Option<InnerAllocator>>
 }
 
@@ -47,31 +48,30 @@ impl LambixAllocator {
     }
 
     fn init(&self) {
-        let mut available_memory = available_memory_iter();
-        let mut counter = 0;
+        let boot_info = unsafe {
+            BootInfo::at(NonNull::new(get_info_header_addr().as_mut_ptr::<InfoHeader>()).unwrap())
+        };
+
+        let mut available_memory = available_memory_iter(&boot_info);
         unsafe {
             self.create_empty_allocator();
             self.add_first_page(&mut available_memory);
-
-            let mut end_addr = self.inner.lock().as_ref().unwrap().memory.end;
             while let Some(memory) = available_memory.next() {
-                map4k(end_addr, memory, Flags::PRESENT | Flags::READ_WRITE | Flags::NO_EXECUTE)
-                    .expect("we shouldn't map over already mapped memory here, something is really wrong");
-
-             
-                end_addr = end_addr.wrapping_add(PageTable::PAGE_SIZE);
-                self.inc_mem_pool(PageTable::PAGE_SIZE);
-
-                counter += 1;
-
-                if counter == 80895 { 
-                    core::ptr::write_volatile(&mut counter as *mut _, counter);
-                }
+                self.add_page_to_memory_pool(memory);
             }
-
-            self.inner.lock().as_mut().unwrap().memory.end = end_addr;
         };
+    }
 
+    pub unsafe fn add_page_to_memory_pool(&self, page_addr: PhyAddr) {
+        let vaddr = self.inner.lock().as_ref().unwrap().memory.end;
+        map4k(vaddr, page_addr, Flags::PRESENT | Flags::READ_WRITE | Flags::NO_EXECUTE)
+            .expect("we shouldn't map over already mapped memory here, something is really wrong");
+        self.inc_mem_pool(PageTable::PAGE_SIZE);
+    }
+
+    #[inline]
+    pub fn page_size(&self) -> usize {
+        PageTable::PAGE_SIZE
     }
 
     fn create_empty_allocator(&self) {
@@ -112,6 +112,7 @@ impl LambixAllocator {
         let mut allocator = lock.as_mut().unwrap();
         allocator.memory.end = allocator.memory.end.wrapping_add(size);
     }
+
 }
 
 
@@ -131,8 +132,8 @@ impl InnerAllocator {
         let new_cursor = self.cursor.wrapping_add(layout.size());
 
         if new_cursor <= self.memory.end {
-            self.cursor = new_cursor;
-            cursor.as_mut()
+            self.cursor = new_cursor; 
+            cursor.as_mut_ptr()
         } else {
             core::ptr::null_mut()
         }
@@ -145,14 +146,13 @@ impl InnerAllocator {
 
 #[inline]
 unsafe fn zero_page_table(page: PhyAddr) {
-    core::ptr::write_bytes(page.as_mut(), 0, PageTable::PAGE_SIZE);
+    core::ptr::write_bytes(page.as_mut_ptr::<u8>(), 0, PageTable::PAGE_SIZE);
 }
 
-fn available_memory_iter() -> impl Iterator<Item=PhyAddr> {
+fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item=PhyAddr> + 'a {
     // here, we still have the 1st GB of memory identity-mapped
-    let tags = unsafe {
-        BOOT_INFO.tags(VirtAddr(BOOT_INFO.paddr().0))
-    };
+    let tags = boot_info.tags();
+    let boot_info_range = boot_info.range();
 
     tags.filter_map(|tag| tag.as_memmap())
         .flat_map(|map| map.entries())
@@ -178,11 +178,11 @@ fn available_memory_iter() -> impl Iterator<Item=PhyAddr> {
                 }
             })
         })
-        .filter(|p| {
+        .filter(move |p| {
             let page = *p .. p.wrapping_add(PageTable::PAGE_SIZE);
             let kernel_range = kernel_range();
-            let boot_info = BOOT_INFO.range();
-            ((page.start >= boot_info.end) || (page.end <= boot_info.start)) 
+
+            ((page.start >= PhyAddr::new(usize::from(boot_info_range.end)) || (page.end <= PhyAddr::new(usize::from(boot_info_range.start)))))
                 && ((page.start >= kernel_range.end) || (page.end <= kernel_range.start))
         })
 }

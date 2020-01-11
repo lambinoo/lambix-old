@@ -22,7 +22,10 @@ pub mod panic;
 
 #[no_mangle]
 pub extern "Rust" fn kernel_main() -> ! {
-    early_kprintln!("kernel main reached");
-    loop {}
+    early_kprintln!("kernel_main reached");
+    loop {
+        early_kprintln!("halting");
+        unsafe { asm!("hlt"); };
+    }
 }
 

@@ -1,36 +1,43 @@
+use core::marker::PhantomData;
 use core::fmt::{Write, Result};
-use super::Character;
+use core::ptr::NonNull;
+use super::Line;
 
-pub type CharacterLine = [Character; 80];
-pub type CharacterBuffer = [CharacterLine; 25];
+pub const COLUMNS: usize = 80;
+pub const LINES: usize = 25;
 
-pub const VGA_BUFFER_ADDR: *mut CharacterBuffer = 0xb8000 as _;
+pub type CharacterBuffer = [Line; LINES];
 
-#[derive(Debug)]
-pub struct VGABuffer {
-    ptr: *mut CharacterBuffer,
+pub struct VGABuffer<'b> {
+    buffer: NonNull<CharacterBuffer>,
     column: usize,
-    current_color: u8
+    current_color: u8,
+    line_sizes: [usize; LINES],
+    _phantom: PhantomData<&'b mut CharacterBuffer>
 }
 
-fn _ref<'a, T>(ptr: *mut T) -> &'a mut T {
-    unsafe { &mut *ptr }
-}
-
-impl VGABuffer {
-    pub const unsafe fn new(addr: *mut CharacterBuffer) -> VGABuffer {
-        VGABuffer {
-            ptr: addr,
+impl<'b> VGABuffer<'b> {
+    /// Create a new VGABuffer to manage a buffer
+    ///
+    /// # Unsafe
+    /// buffer must point to a valid vga buffer
+    pub const unsafe fn new(buffer: NonNull<CharacterBuffer>) -> VGABuffer<'b> {
+        let vga_buffer = VGABuffer {
+            buffer,
             column: 0,
-            current_color: 7
-        }
-    } 
+            current_color: 7,
+            line_sizes: [0; LINES],
+            _phantom: PhantomData
+        };
+        vga_buffer 
+    }
 
     pub fn clear(&mut self) {
-        for line in _ref(self.ptr).iter_mut() {
-            for c in line.iter_mut() {
-                c.character = b' ';
-                c.color = 0;
+        let buffer = unsafe { self.buffer.as_mut() };
+        for i in 0..buffer.len() {
+            self.line_sizes[i] = 0;
+            for j in 0..buffer[i].len() {
+                buffer[i].set(j, 0, 0);
             }
         }
     }
@@ -39,10 +46,30 @@ impl VGABuffer {
         self.current_color = color;
     }
 
+    /// Change the internal buffer address (in case it's remapped for example)
+    ///
+    /// # Unsafe
+    /// See `VGABuffer::new()` constraints.
+    pub unsafe fn set_buffer_addr(&mut self, addr: NonNull<CharacterBuffer>) {
+        *self = VGABuffer::new(addr);
+        self.clear();
+    }
+
     fn move_all_lines_up(&mut self) {
-        let buffer = _ref(self.ptr);
-        for i in 1..buffer.len() {
-            buffer[i-1] = buffer[i].clone();
+        unsafe {
+            for i in 1..LINES {
+                let lines = self.buffer.as_mut();
+
+                for j in 0..self.line_sizes[i] {
+                    lines[i-1].set_char(j, lines[i].get_char(j));
+                }
+
+                for j in self.line_sizes[i]..self.line_sizes[i-1] {
+                    lines[i-1].set(j, b' ', 0);
+                }
+
+                self.line_sizes[i-1] = self.line_sizes[i];
+            }
         }
     }
 
@@ -53,31 +80,26 @@ impl VGABuffer {
     }
 
     fn write_byte(&mut self, character: u8) {
-        let last_line = _ref(self.ptr).last_mut().unwrap();
-        let ptr = (&mut last_line[self.column]) as *mut Character;
-        unsafe {
-             core::ptr::write_volatile(ptr, Character {
-                color: self.current_color,
-                character
-             });
-        };
+        let last_line = unsafe { self.buffer.as_mut().last_mut().unwrap() };
+        last_line.set(self.column, character, self.current_color);
 
         self.column += 1;
+        self.line_sizes[LINES - 1] = self.column;
         if self.column == last_line.len() {
             self.new_line();
         }
     }
 
     fn clear_last_line(&mut self) {
-        let line = &mut _ref(self.ptr).last_mut().unwrap();
-        for c in line.iter_mut() {
-            c.character = b' ';
-            c.color = 0;
+        let line = unsafe { self.buffer.as_mut().last_mut().unwrap() };
+        for i in 0..self.line_sizes[LINES - 1] {
+            line.set(i, b' ', 0);
         }
-    }
+        self.line_sizes[LINES - 1] = 0;
+    } 
 }
 
-impl Write for VGABuffer {
+impl<'b> Write for VGABuffer<'b> {
     fn write_str(&mut self, s: &str) -> Result {
         let mut chars = s.chars();
         while let Some(c) = chars.next(){

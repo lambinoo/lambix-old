@@ -91,7 +91,7 @@ pub unsafe fn unmap2m(vaddr: VirtAddr) -> Result<()> {
 }
 
 #[inline]
-unsafe fn invalidate_page(vaddr: VirtAddr) {
+pub unsafe fn invalidate_page(vaddr: VirtAddr) {
     asm!("invlpg ($0)" :: "r"(vaddr) : "memory");
 }
 

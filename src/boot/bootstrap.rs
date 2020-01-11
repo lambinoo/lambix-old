@@ -1,12 +1,12 @@
 use lib::*;
 use crate::kernel;
-use crate::kernel::idt::*;
-use crate::kernel::table::idt::*;
 use crate::kernel_main;
+/*use crate::kernel::idt::*;
+use crate::kernel::table::idt::*;
 use crate::kernel::mem::addr::*;
 use crate::kernel::mem::vbox::VBox;
 
-use core::convert::TryFrom;
+use core::convert::TryFrom;*/
 use core::sync::atomic::*;
 
 #[no_mangle]
@@ -16,7 +16,7 @@ pub unsafe extern "C" fn kernel_bootstrap() -> ! {
     kernel::mem::setup_memory();
     kernel::idt::setup_idt();
     
-    setup_apic();
+    //setup_apic();
     kernel_main();
 }
 
@@ -26,14 +26,7 @@ struct APICRegisters {
 }
 
 
-static TIMER_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-isr! {
-    fn timer_handler() {
-        TIMER_COUNTER.fetch_add(1, Ordering::Relaxed);
-    }
-}
-
+/*
 unsafe fn setup_apic() {
     io_write_port!(u8, 0xa1, 0xff);
     io_write_port!(u8, 0x21, 0xff);
@@ -43,8 +36,6 @@ unsafe fn setup_apic() {
     let mut apic_addr_reg = readmsr!(apic_msr_reg);
     apic_addr_reg[1] |= 1 << 11;
     writemsr!(apic_msr_reg, apic_addr_reg);
-
-    early_kprintln!("{:?}", apic_addr_reg);
 
     let mask: u64 = !(0xfff | (0xfff << 52));
     let apic_base_addr = PhyAddr::from(usize::try_from(
@@ -87,6 +78,7 @@ unsafe fn setup_apic() {
         }
     }
 }
+*/
 
 
 /*

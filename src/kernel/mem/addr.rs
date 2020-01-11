@@ -1,5 +1,6 @@
 use core::ops::*;
 use core::mem::align_of;
+use core::ptr::NonNull;
 
 macro_rules! op {
     ($name:ident, $tr:ident, $trass:ident, $fn_name:ident, $fnass_name:ident) => {
@@ -24,74 +25,74 @@ macro_rules! address {
     ($name:ident; $type:ty) => {
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
         #[repr(transparent)]
-        pub struct $name(pub *const $type);
+        pub struct $name(pub usize);
 
         impl $name {
-            pub const NULL: $name = $name(0 as _);
-
-            pub fn wrapping_add(&self, value: usize) -> Self {
-                $name(self.0.wrapping_add(value))
+            pub const fn new(value: usize) -> Self {
+                Self(value)
             }
 
-            pub fn align<T>(&self) -> $name {
-                self.wrapping_add(self.0.align_offset(align_of::<T>()))
+            pub const fn null() -> $name {
+                Self::new(0)
             }
 
-            pub fn align_to(&self, value: usize) -> $name {
-                self.wrapping_add(self.0.align_offset(value))
+            pub const fn is_null(&self) -> bool {
+                self.0 == 0
             }
 
-            pub fn is_null(&self) -> bool {
-                Self::NULL.0 == self.0
+            pub const fn as_ptr<T>(self) -> *const T {
+                self.0 as _
             }
 
-            pub fn is_aligned(&self, align: usize) -> bool {
-                let addr = usize::from(*self);
-                (addr & (align - 1)) == 0
-            }
-
-            pub fn as_ptr(self) -> *const u8 {
-                self.0
-            }
-
-            pub fn as_mut(self) -> *mut u8 {
+            pub const fn as_mut_ptr<T>(self) -> *mut T {
                 self.0 as _
             }
         }
 
         impl<T> From<&T> for $name {
             fn from(addr: &T) -> $name {
-                $name(addr as *const T as _)
+                Self::from(addr as *const T)
+            }
+        }
+
+        impl<T> From<&mut T> for $name {
+            fn from(addr: &mut T) -> $name {
+                Self::from(addr as *mut T)
             }
         }
 
         impl<T> From<*mut T> for $name {
             fn from(addr: *mut T) -> $name {
-                $name(addr as *const T as _)
+                Self(addr as usize)
             }
         }
         
         impl<T> From<*const T> for $name {
             fn from(addr: *const T) -> $name {
-                $name(addr as *const T as _)
+                Self(addr as usize)
             }
         }
 
-  
+        impl<T> From<NonNull<T>> for $name {
+            fn from(ptr: NonNull<T>) -> Self {
+                Self::from(ptr.as_ptr())
+            }
+        }
+
         impl From<usize> for $name {
-            fn from(addr: usize) -> $name {
-                $name(addr as _)
+            fn from(addr: usize) -> Self {
+                Self(addr)
             }
         }
 
         impl From<$name> for usize {
             fn from(addr: $name) -> usize {
-                addr.0 as usize
+                addr.0
             }
         }
 
         impl $name {
-            pub fn distance(&self, end: $name) -> usize {
+            pub fn distance(&self, end: PhyAddr) -> usize {
                 let end = usize::from(end);
                 let start = usize::from(*self);
 
@@ -109,8 +110,33 @@ macro_rules! address {
             pub unsafe fn to_ref_mut<'a, T>(self) -> &'a mut T {
                 &mut *(self.0 as *mut T)
             }
+
+
+            pub fn is_aligned(&self, align: usize) -> bool {
+                let addr = usize::from(*self);
+                (addr & (align - 1)) == 0
+            }
+
+            pub fn wrapping_add(&self, value: usize) -> Self {
+                $name(self.0.wrapping_add(value))
+            }
+
+            pub fn wrapping_sub(&self, value: usize) -> Self {
+                $name(self.0.wrapping_sub(value))
+            }
+
+            pub fn align<T>(&self) -> $name {
+                Self::from(self.wrapping_add(
+                    self.as_ptr::<u8>().align_offset(align_of::<T>())
+                ))
+            }
+
+            pub fn align_to(&self, value: usize) -> $name {
+                self.wrapping_add(self.as_ptr::<u8>().align_offset(value))
+            }
         }
 
+        
         op!($name, BitOr, BitOrAssign, bitor, bitor_assign);
         op!($name, BitAnd, BitAndAssign, bitand, bitand_assign);
         op!($name, Shl, ShlAssign, shl, shl_assign);

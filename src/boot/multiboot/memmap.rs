@@ -6,7 +6,6 @@ use core::ops::Index;
 use core::fmt;
 
 #[repr(C)]
-#[derive(Debug)]
 pub struct MemoryMap {
     tag: Tag, 
     entry_size: u32,

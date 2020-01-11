@@ -8,17 +8,18 @@ use alloc::boxed::Box;
 
 use core::ops::Range;
 use core::ptr::NonNull;
+use core::mem::ManuallyDrop;
 
 static ALLOCATOR: Spinlock<Option<VAllocator>> = Spinlock::new(None);
 
 #[derive(Debug)]
 pub struct VBox<T> {
-    inner_box: Box<T>,
+    inner_box: ManuallyDrop<Box<T>>,
     paddr: PhyAddr
 }
 
 impl<T> VBox<T> {
-    pub unsafe fn new(paddr: PhyAddr) -> VBox<T> {
+   pub unsafe fn new(paddr: PhyAddr) -> VBox<T> {
         VBox::with_flags(paddr, Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH)
     }
 
@@ -39,16 +40,23 @@ impl<T> VBox<T> {
                 offset += PAGE_SIZE;
             }
 
-            use lib::*;
-            set_cr3!(get_cr3!()); // flush everything!
-
             VBox {
-                inner_box: Box::from_raw(base_addr as *mut T),
+                inner_box: ManuallyDrop::new(Box::from_raw(base_addr as *mut T)),
                 paddr: paddr
             }
         } else {
             panic!("VBox framework wasn't initialized before use");
         }
+    }
+
+    pub fn leak<'a>(vb: VBox<T>) -> &'a mut T {
+        unsafe { &mut *VBox::into_raw(vb) }
+    }
+
+    pub fn into_raw(mut vb: VBox<T>) -> *mut T {
+        let ptr = vb.inner_box.as_mut() as *mut T;
+        core::mem::forget(vb);
+        ptr
     }
 
     #[inline]
@@ -125,3 +133,4 @@ pub unsafe fn init() {
         *allocator = Some(VAllocator::new());
     }
 }
+
