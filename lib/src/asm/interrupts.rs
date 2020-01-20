@@ -18,18 +18,23 @@ macro_rules! disable_interrupts {
 #[macro_export]
 macro_rules! isr {
     (
-        fn $name:ident($($arg:ident: $argtype:ty),*) {
+        $($v:vis fn $name:ident($($arg:ident: $argtype:ty),*) {
             $($body:tt)*
-        }
+        })*
     ) => {
-        unsafe extern "x86-interrupt" fn $name($($arg: $argtype),*) {
+        #[allow(unreachable_code)]
+        $($v unsafe extern "x86-interrupt" fn $name($($arg: $argtype),*) {
             {
+                let f = move || {
+                    $($body)*
+                };
+
                 use lib::{enable_interrupts, disable_interrupts};
                 disable_interrupts!();
-                $($body)*
+                f();
                 enable_interrupts!();
             }
-        }
+        })*
     };
 }
 

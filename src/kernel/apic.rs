@@ -1,118 +1,106 @@
+use crate::kernel::mem::addr::*;
+use crate::kernel::mem::vbox::*;
+
 use lib::*;
 use lib::sync::*;
-use core::ptr::*;
 
-pub static APIC: Spinlock<APICRegisters> = Spinlock::new(APICRegisters { base_addr: None });
-pub type Result<T> = core::result::Result<T, ()>;
+use core::convert::TryFrom;
+use core::sync::atomic::*;
+use ::alloc::vec::Vec;
 
-macro_rules! set_registers {
-    ($(
-        ($name:ident, $register:expr, $type:ty)
-    )*) => {
-        $(
-            pub unsafe fn $name(&mut self, value: $type) -> Result<()> {
-                self.set_register($register, value)
-            }
-        )*
+static APIC_REGS: Spinlock<Vec<APIC>> = Spinlock::new(Vec::new());
+
+pub struct APIC {
+    handle: VBox<APICRegisters>,
+    cpu_hw_id: u8,
+    is_bsc: bool
+}
+
+impl APIC {
+    fn get32(&self, register: APICRegister) -> &AtomicU32 {
+        &self.handle.registers[(register as usize) / 4]
+    }
+
+    fn get64(&self, register: APICRegister) -> &AtomicU64 {
+        unsafe { core::mem::transmute(self.get32(register)) }
     }
 }
 
 #[repr(usize)]
 enum APICRegister {
-    APICID = 0x20,
-    APICVersion = 0x30,
+    ApicID = 0x20,
+    ApicVersion = 0x30,
     TaskPriority = 0x80,
+    ArbitrationPriority = 0x90,
+    ProcessorPriority = 0xa0,
+    EndOfInterrupt = 0xb0,
+    RemoteRead = 0xc0,
+    LogicalDestination = 0xd0,
+    DestinationFormat = 0xe0,
     SpuriousInterruptVector = 0xf0,
-    TriggerMode = 0x200,
+    InService = 0x100,
+    TriggerMode = 0x180,
+    InterruptRequest = 0x200,
     ErrorStatus = 0x280,
-    TimerLocalVector = 0x320
+    InterruptCommandLow = 0x300,
+    InterruptCommandHigh = 0x310,
+    TimerLocalVectorTable = 0x320,
+    ThermalLocalVector = 0x330,
+    PerformanceCounterLocalVectorTable = 0x340,
+    LocalInterrupt0VectorTable = 0x350,
+    LocalInterrupt1VectorTable = 0x360,
+    ErrorVectorTable = 0x370,
+    TimerInitialCount = 0x380,
+    TimerCurrentCount = 0x390,
+    TimerDivideConfiguration = 0x3e0,
+    ExtendedAPICFeature = 0x400,
+    ExtendedAPICControl = 0x410,
+    SpecificEndOfInterrupt = 0x420
 }
 
-pub struct APICRegisters {
-    base_addr: Option<NonNull<u8>>
+
+#[repr(align(4096))]
+struct APICRegisters {
+    registers: [AtomicU32; 1024]
 }
 
 impl APICRegisters {
-    const MSR_APIC: u32 = 0x0000_001B;
-    const CPUID_REGISTER: u32 = 0x1;
-    const CPUID_APIC_AVAILABLE_FLAG: u32 = 1 << 9;
-
-    const IS_BOOT_CPU: u32 = 1 << 8;
-    const APIC_ENABLE: u32 = 1 << 11;
-
-    const MASK_ADDR1: u64 = 0xfffff000;
-    const MASK_ADDR0: u64 = 0xfffff;
-
-    set_registers!{
-        (set_local_timer, APICRegister::TimerLocalVector, u32)
-        (set_spurious_interrupt, APICRegister::SpuriousInterruptVector, u32)
-    }
-
-    pub fn is_available(&self) -> bool {
-        self.base_addr.is_some()
-    }
-
-    fn get_register<T>(&self, offset: APICRegister) -> Result<T> {
-        if let Some(base_addr) = self.base_addr {
-            unsafe {
-                let register = base_addr.as_ptr().add(offset as usize) as *const T;
-                Ok(register.read_volatile())
-            }
-        } else {
-            Err(())
-        }
-    }
-
-    unsafe fn set_register<T>(&mut self, offset: APICRegister, value: T) -> Result<()> {
-        if let Some(base_addr) = self.base_addr {
-            let register = base_addr.as_ptr().add(offset as usize) as *mut T;
-            register.write_volatile(value);
-            Ok(())
-        } else {
-            Err(())
-        }
-    }
+    const MSR_APIC_BASE_ADDR: usize = 0x1b;
+    const BSC_BIT: u32 = 8;
+    const APIC_ENABLE_BIT: u32 = 1 << 11;
+    const ADDR_MASK_HIGH: u32 = (1 << 20) - 1;
+    const ADDR_MASK_LOW: u32 = !((1 << 12) - 1);
 }
 
-pub fn setup_apic() -> Result<()> {
-    if is_apic_supported_by_cpu() {
-        disable_pic();  
 
-        let mut apic_reg = readmsr!(APICRegisters::MSR_APIC);
+pub fn setup_apic() {
+    disable_pic();
 
-        // just an address for development purposes
-        let pic_addr = 0x0010_0000u64;
-        apic_reg[0] = ((pic_addr >> 32) & APICRegisters::MASK_ADDR0) as u32;
-        apic_reg[1] = (pic_addr & APICRegisters::MASK_ADDR1) as u32;
-        apic_reg[1] |= APICRegisters::IS_BOOT_CPU;
-        apic_reg[1] |= APICRegisters::APIC_ENABLE;
-
-        unsafe {
-            writemsr!(APICRegisters::MSR_APIC, apic_reg)
-        };
-
-        assert!(readmsr!(APICRegisters::MSR_APIC) == apic_reg);
-
-        if let Some(pic_addr) = NonNull::new(pic_addr as _) {
-            APIC.lock().base_addr = Some(pic_addr);
-            Ok(())
-        } else {
-            Err(())
-        }
-    } else {
-        Err(())
-    }
-}
-
-fn is_apic_supported_by_cpu() -> bool {
-    let cap: u32;
+    let mut register = readmsr!(APICRegisters::MSR_APIC_BASE_ADDR);
+    register[1] |= APICRegisters::APIC_ENABLE_BIT;
     unsafe {
-        asm!("cpuid"
-            :"={edx}"(cap)
-            :"{eax}"(APICRegisters::CPUID_REGISTER))
+        writemsr!(APICRegisters::MSR_APIC_BASE_ADDR, register);
+    };
+    
+    let phy_addr = PhyAddr::new(
+        usize::try_from(register[0] & APICRegisters::ADDR_MASK_HIGH).unwrap() |
+        usize::try_from(register[1] & APICRegisters::ADDR_MASK_LOW).unwrap()
+    );
+
+    let apic = APIC {
+        handle: unsafe { VBox::with_flags(phy_addr, Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH | Flags::READ_WRITE) },
+        cpu_hw_id: u8::try_from(cpuid!(0x1)[1] >> 24).unwrap(),
+        is_bsc: (register[1] & APICRegisters::BSC_BIT) != 0
     };
 
-    cap & APICRegisters::CPUID_APIC_AVAILABLE_FLAG != 0
+/*
+    apic.get32(APICRegister::SpuriousInterruptVector).store(150 | (1 << 8), Ordering::SeqCst);
+    apic.get32(APICRegister::TaskPriority).store(0, Ordering::SeqCst);
+    apic.get32(APICRegister::TimerDivideConfiguration).store(0b1011, Ordering::SeqCst);
+    apic.get32(APICRegister::TimerLocalVectorTable).store(200 | (1 << 17), Ordering::SeqCst);
+    apic.get32(APICRegister::TimerInitialCount).store(1, Ordering::SeqCst);*/
+
+    APIC_REGS.lock().push(apic);
 }
 
 #[inline]

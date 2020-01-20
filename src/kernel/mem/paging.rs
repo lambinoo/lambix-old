@@ -36,7 +36,7 @@ pub unsafe fn get_physical_page(addr: VirtAddr) -> Result<PhyAddr> {
 ///
 /// You have to ensure that the physical address is 4k-aligned, and doesn't have it's higher
 /// significant bit (the 64th one) set as it's used for NX pages.
-pub unsafe fn map4k(vaddr: VirtAddr, paddr: PhyAddr, flags: Flags)-> Result<()> {
+pub unsafe fn map4k(vaddr: VirtAddr, paddr: PhyAddr, flags: Flags)-> Result<()> { 
     let root_entry = PageTable::get_entry(PageTableType::PML4T, vaddr);
     allocate_if_not_exist(root_entry);
 
@@ -91,11 +91,16 @@ pub unsafe fn unmap2m(vaddr: VirtAddr) -> Result<()> {
 }
 
 #[inline]
-pub unsafe fn invalidate_page(vaddr: VirtAddr) {
-    asm!("invlpg ($0)" :: "r"(vaddr) : "memory");
+pub fn invalidate_page(vaddr: VirtAddr) {
+    unsafe { asm!("invlpg ($0)" :: "r"(vaddr) : "memory") };
 }
 
-unsafe fn get_pt_entry<'a>(vaddr: VirtAddr) -> Result<&'a Entry> {
+#[inline]
+pub fn purge_tlb() {
+    unsafe { set_cr3!(get_cr3!()); };
+}
+
+pub unsafe fn get_pt_entry<'a>(vaddr: VirtAddr) -> Result<&'a Entry> {
     if PageTable::get_entry(PageTableType::PML4T, vaddr).is_present() 
         && PageTable::get_entry(PageTableType::PDPT, vaddr).is_present()
         && PageTable::get_entry(PageTableType::PDT, vaddr).is_present() {

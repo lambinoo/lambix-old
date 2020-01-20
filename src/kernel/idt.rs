@@ -1,20 +1,7 @@
 use crate::kernel::table::idt::*;
 
-use lib::sync::*;
-use lib::*;
-
-use alloc::vec::Vec;
-
-static LOADED_IDT: Vec<IDT> = Vec::new();
-
-isr!{
-    fn default_handler() {
-        early_kprintln!("blank handler");
-    }
-}
-
-
-pub fn setup_idt() {
-    
+pub unsafe fn setup_idt() {
+    let new_idt = IDT::new();
+    IDT::set_for_this_cpu(new_idt);
 }
 

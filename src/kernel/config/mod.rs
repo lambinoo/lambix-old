@@ -11,7 +11,6 @@ export![
     USERSPACE_END = _1TB * 128;
 
     // 16M TB hole
-
     KERNELSPACE_BASE = TOP - (_1TB * 128) + 1;
     // 8TB guard hole
     PHYSICAL_MEMORY_MAPPING_BASE = KERNELSPACE_BASE + _1TB * 8;

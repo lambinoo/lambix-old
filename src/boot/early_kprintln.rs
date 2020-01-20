@@ -25,7 +25,7 @@ macro_rules! early_kprint {
     ($($arg:tt)*) => (
         {
             $crate::boot::early_kprintln::write_to_serial(format_args!( $($arg)* ));
-            $crate::boot::vga_buffer::_print(format_args!( $($arg)* ));
+            $crate::drivers::vga_buffer::_print(format_args!( $($arg)* ));
         }
     )
 }
@@ -36,7 +36,7 @@ macro_rules! early_kprintln {
     ($($arg:tt)*) => (
         {
             $crate::boot::early_kprintln::write_to_serial(format_args_nl!( $($arg)* ));
-            $crate::boot::vga_buffer::_print(format_args_nl!( $($arg)* ));
+            $crate::drivers::vga_buffer::_print(format_args_nl!( $($arg)* ));
         }
     )
 }

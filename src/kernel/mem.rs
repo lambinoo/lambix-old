@@ -3,14 +3,15 @@ pub mod addr;
 pub mod alloc;
 pub mod vbox;
 
-pub unsafe fn setup_memory() {
-    use addr::*;
-    use paging::*;
-    use vbox::*;
-    use crate::boot::vga_buffer::*;
-    use core::ptr::NonNull;
-    use crate::boot::multiboot;
+use addr::*;
+use paging::*;
+use vbox::*;
+use crate::drivers::vga_buffer::*;
+use crate::boot::multiboot;
 
+use core::ptr::NonNull;
+
+pub unsafe fn setup_memory() { 
     paging::init();
     alloc::init();
     vbox::init();

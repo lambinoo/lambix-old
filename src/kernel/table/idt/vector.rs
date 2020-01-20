@@ -1,5 +1,7 @@
 use core::convert::From;
+use core::convert::TryFrom;
 
+#[derive(Debug)]
 pub enum Vector {
     DivideByZero,
     Debug,
@@ -36,7 +38,30 @@ impl From<Vector> for usize {
     }
 }
 
+impl TryFrom<usize> for Vector {
+    type Error = ();
+    fn try_from(vector: usize) -> Result<Vector, ()> {
+        match vector {
+            0  => Ok(Vector::DivideByZero),
+            1  => Ok(Vector::Debug),
+            2  => Ok(Vector::NMI),
+            3  => Ok(Vector::Breakpoint),
+            4  => Ok(Vector::Overflow),
+            5  => Ok(Vector::BoundRange),
+            6  => Ok(Vector::InvalidOpCode),
+            7  => Ok(Vector::DeviceNotAvailable),
+            16 => Ok(Vector::X87FloatingPoint),
+            18 => Ok(Vector::MachineCheck),
+            19 => Ok(Vector::SIMDFloatingPoint),
+            29 => Ok(Vector::VMMCommunication),
+            30 => Ok(Vector::Security),
+            _ => Err(())
+        }
+    }
+}
 
+
+#[derive(Debug)]
 pub enum VectorWithError {
     DoubleFault,
     InvalidTSS,
@@ -57,6 +82,22 @@ impl From<VectorWithError> for usize {
             VectorWithError::GeneralProtection => 13,
             VectorWithError::PageFault => 14,
             VectorWithError::AlignmentCheck => 17
+        }
+    }
+}
+
+impl TryFrom<usize> for VectorWithError {
+    type Error = ();
+    fn try_from(vector: usize) -> Result<VectorWithError, ()> {
+        match vector {
+            8 =>  Ok(VectorWithError::DoubleFault),
+            10 => Ok(VectorWithError::InvalidTSS),
+            11 => Ok(VectorWithError::SegmentNotPresent),
+            12 => Ok(VectorWithError::Stack),
+            13 => Ok(VectorWithError::GeneralProtection),
+            14 => Ok(VectorWithError::PageFault),
+            17 => Ok(VectorWithError::AlignmentCheck),
+            _ => Err(())
         }
     }
 }

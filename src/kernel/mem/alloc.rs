@@ -48,18 +48,20 @@ impl LambixAllocator {
     }
 
     fn init(&self) {
-        let boot_info = unsafe {
-            BootInfo::at(NonNull::new(get_info_header_addr().as_mut_ptr::<InfoHeader>()).unwrap())
-        };
+        if self.inner.lock().is_none() {
+            let boot_info = unsafe {
+                BootInfo::at(NonNull::new(get_info_header_addr().as_mut_ptr::<InfoHeader>()).unwrap())
+            };
 
-        let mut available_memory = available_memory_iter(&boot_info);
-        unsafe {
-            self.create_empty_allocator();
-            self.add_first_page(&mut available_memory);
-            while let Some(memory) = available_memory.next() {
-                self.add_page_to_memory_pool(memory);
-            }
-        };
+            let mut available_memory = available_memory_iter(&boot_info);
+            unsafe {
+                self.create_empty_allocator();
+                self.add_first_page(&mut available_memory);
+                while let Some(memory) = available_memory.next() {
+                    self.add_page_to_memory_pool(memory);
+                }
+            };
+        }
     }
 
     pub unsafe fn add_page_to_memory_pool(&self, page_addr: PhyAddr) {
@@ -77,11 +79,7 @@ impl LambixAllocator {
     fn create_empty_allocator(&self) {
         let mut lock = self.inner.lock();
         let base_addr = VirtAddr::from(PHYSICAL_MEMORY_MAPPING_BASE);
-        if lock.is_none() {
-            *lock = Some(InnerAllocator::new(base_addr..base_addr));
-        } else {
-            panic!("an allocator already exists");
-        }
+        *lock = Some(InnerAllocator::new(base_addr..base_addr));
     }
 
     unsafe fn add_first_page(&self, available_memory: &mut impl Iterator<Item=PhyAddr>) { 

@@ -8,6 +8,10 @@ edition = "2018"
 bitflags = "1.2.0"
 lib = { path = "lib/" }
 
+[dependencies.backtrace]
+version = "0.3"
+default-features = false
+
 [build-dependencies]
 sha1 = "0.6"
 

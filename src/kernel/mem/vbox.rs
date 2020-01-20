@@ -6,6 +6,8 @@ use crate::kernel::config::*;
 use alloc::alloc::Layout;
 use alloc::boxed::Box;
 
+pub use crate::kernel::mem::paging::Flags;
+
 use core::ops::Range;
 use core::ptr::NonNull;
 use core::mem::ManuallyDrop;

@@ -25,7 +25,7 @@ KERNEL = target/$(TARGET_TRIPLE)/$(PROFILE)/$(KERNEL_NAME)
 KERNEL_ISO = $(BUILD_DIR)/isodir/boot/$(KERNEL_NAME)
 
 # debug
-QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log -m 4G
+QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log -m 4G -smp 4
 
 ifeq ($(PROFILE),release)
     CARGO_FLAGS = --release

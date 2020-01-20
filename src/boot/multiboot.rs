@@ -21,7 +21,6 @@ impl BootInfo {
     }
  
     pub fn len(&self) -> usize {
-        early_kprintln!("bloop");
         unsafe {
             usize::try_from(self.header.as_ref().total_size).unwrap()
         }

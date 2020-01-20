@@ -38,7 +38,7 @@ impl Entry {
     /// # Safety
     /// `addr` must be a properly masked & `flags` must only contains valid flags for the type of entry
     /// cf. `set_value` for reference.
-    pub unsafe fn set(&self, addr: PhyAddr, flags: Flags) {
+    pub unsafe fn set(&self, addr: PhyAddr, flags: Flags) { 
         self.set_value(usize::from(addr) | flags.bits())
     }
 
@@ -69,7 +69,7 @@ impl PageTable {
     pub const PAGE_SIZE: usize   = 1 << Self::PAGE_BITS;
 
     pub fn default_flags() -> Flags {
-        Flags::NO_EXECUTE | Flags::READ_WRITE | Flags::PRESENT
+        Flags::PRESENT
     }
 
     /// Return the table of type `table_type` associated with the address `addr`

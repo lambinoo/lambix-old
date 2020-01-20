@@ -36,7 +36,7 @@ pde_early_kernel_space:
     resb 4096
 
 ;-----------------------
-section .bss.init.gdt_table align=4096
+section .data.init.gdt_table align=4096
 gdt_table:
     .null:
         dq 0
