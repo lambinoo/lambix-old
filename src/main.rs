@@ -25,9 +25,9 @@ pub mod panic;
 #[no_mangle]
 pub fn kernel_main() -> ! {
     early_kprintln!("kernel_main reached");
- 
+
     loop {
-        early_kprintln!("halting");
+        early_kprintln!("tick");
         unsafe { asm!("hlt"); };
     }
 }

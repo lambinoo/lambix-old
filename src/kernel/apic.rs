@@ -1,5 +1,8 @@
+pub mod registers;
+
 use crate::kernel::mem::addr::*;
 use crate::kernel::mem::vbox::*;
+use registers::*;
 
 use lib::*;
 use lib::sync::*;
@@ -17,6 +20,14 @@ pub struct APIC {
 }
 
 impl APIC {
+    pub fn get_id(&self) -> usize {
+        usize::try_from(
+            self.get32(APICRegister::ApicID).load(Ordering::SeqCst) >> 24
+        ).unwrap()
+    }
+}
+
+impl APIC {
     fn get32(&self, register: APICRegister) -> &AtomicU32 {
         &self.handle.registers[(register as usize) / 4]
     }
@@ -25,6 +36,7 @@ impl APIC {
         unsafe { core::mem::transmute(self.get32(register)) }
     }
 }
+
 
 #[repr(usize)]
 enum APICRegister {
@@ -93,14 +105,8 @@ pub fn setup_apic() {
         is_bsc: (register[1] & APICRegisters::BSC_BIT) != 0
     };
 
-/*
-    apic.get32(APICRegister::SpuriousInterruptVector).store(150 | (1 << 8), Ordering::SeqCst);
-    apic.get32(APICRegister::TaskPriority).store(0, Ordering::SeqCst);
-    apic.get32(APICRegister::TimerDivideConfiguration).store(0b1011, Ordering::SeqCst);
-    apic.get32(APICRegister::TimerLocalVectorTable).store(200 | (1 << 17), Ordering::SeqCst);
-    apic.get32(APICRegister::TimerInitialCount).store(1, Ordering::SeqCst);*/
-
     APIC_REGS.lock().push(apic);
+
 }
 
 #[inline]

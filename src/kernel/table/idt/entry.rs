@@ -52,6 +52,7 @@ pub struct EntryInner {
     reserved: u32
 }
 
+
 #[repr(u8)]
 pub enum DPL {
     PRIVILEGE0 = 0,
@@ -59,6 +60,7 @@ pub enum DPL {
     PRIVILEGE2 = 2 << 5,
     PRIVILEGE3 = 3 << 5,
 }
+
 
 #[repr(u8)]
 pub enum GateType {

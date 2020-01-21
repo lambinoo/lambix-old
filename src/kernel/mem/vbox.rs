@@ -14,17 +14,43 @@ use core::mem::ManuallyDrop;
 
 static ALLOCATOR: Spinlock<Option<VAllocator>> = Spinlock::new(None);
 
+/// Map a physical address to the virtual address space. This is highly unsafe as it can lead to manipulating memory in-use by other part of the kernel
+/// on this or another CPU.
+/// It can also lead to unaligned read of memory if you are not careful.
+///
+/// Size of the structure that will be mapped have to be a multiple of the page size.
 #[derive(Debug)]
 pub struct VBox<T> {
-    inner_box: ManuallyDrop<Box<T>>,
-    paddr: PhyAddr
+    inner_box: ManuallyDrop<Box<T>>
 }
 
 impl<T> VBox<T> {
-   pub unsafe fn new(paddr: PhyAddr) -> VBox<T> {
+    /**
+     * Map a physical address to the virtual address space with default flags.
+     * Those flags are [`PRESENT`], [`READ_WRITE`], [`NO_EXECUTE`],  [`CACHE_DISABLE`] and [`WRITETHROUGH`].
+     *
+     * # Safety
+     * You have to be careful which physical address you map. You could access memory that is used
+     * somewhere else in the code and/or by another CPU.
+     *
+     * [`PRESENT`]: ../../table/paging/struct.Flags.html#associatedconstant.PRESENTcar
+     * [`READ_WRITE`]: ../../table/paging/struct.Flags.html#associatedconstant.READ_WRITE
+     * [`NO_EXECUTE`]: ../../table/paging/struct.Flags.html#associatedconstant.NO_EXECUTE
+     * [`CACHE_DISABLE`]: ../../table/paging/struct.Flags.html#associatedconstant.CACHE_DISABLE
+     * [`WRITETHROUGH`]: ../../table/paging/struct.Flags.html#associatedconstant.WRITETHROUGH
+     **/
+    pub unsafe fn new(paddr: PhyAddr) -> VBox<T> {
         VBox::with_flags(paddr, Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH)
     }
 
+    /**
+     * Map a physical address with custom flags. The PRESENT flag is always implied.
+     *
+     * # Safety
+     * Check the documentation for [`VBox::new`] for more information about safety.
+     *
+     * [`VBox::new`]: struct.VBox.html#method.new
+     **/
     pub unsafe fn with_flags(paddr: PhyAddr, flags: Flags) -> VBox<T> {
         let layout = Self::layout();
 
@@ -38,19 +64,21 @@ impl<T> VBox<T> {
                     paddr.wrapping_add(offset),
                     Flags::PRESENT | flags
                 ).expect("failed to map virtual memory for VBox");
-
                 offset += PAGE_SIZE;
             }
 
             VBox {
-                inner_box: ManuallyDrop::new(Box::from_raw(base_addr as *mut T)),
-                paddr: paddr
+                inner_box: ManuallyDrop::new(Box::from_raw(base_addr as *mut T))
             }
         } else {
             panic!("VBox framework wasn't initialized before use");
         }
     }
 
+    /**
+     * Leaks a reference to the content of the VBox.
+     * Destructor will therefore not be run
+     **/
     pub fn leak<'a>(vb: VBox<T>) -> &'a mut T {
         unsafe { &mut *VBox::into_raw(vb) }
     }
@@ -59,6 +87,12 @@ impl<T> VBox<T> {
         let ptr = vb.inner_box.as_mut() as *mut T;
         core::mem::forget(vb);
         ptr
+    }
+
+    pub unsafe fn from_raw(p: *mut T) -> VBox<T> {
+        VBox {
+            inner_box: ManuallyDrop::new(Box::from_raw(p))
+        } 
     }
 
     #[inline]
@@ -83,14 +117,14 @@ impl<T> core::ops::DerefMut for VBox<T> {
 
 impl<T> Drop for VBox<T> {
     fn drop(&mut self) {
-        let base_addr = self.inner_box.as_mut() as *mut T as *mut u8;
-
+        let base_addr = self.inner_box.as_mut() as *mut T;
         unsafe {
+            core::ptr::drop_in_place(base_addr);
             unmap4k(VirtAddr::from(base_addr)).expect("unsound state, already allocated vmem not mapped");
         };
 
         if let Some(ref mut allocator) = *ALLOCATOR.lock() {
-            allocator.dealloc(Self::layout(), base_addr);
+            allocator.dealloc(Self::layout(), base_addr as *mut u8);
         }
     }
 }

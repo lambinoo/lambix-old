@@ -1,8 +1,5 @@
 use crate::kernel;
 use crate::kernel_main;
-use crate::kernel::config::*;
-use crate::kernel::mem::paging::*;
-use crate::kernel::mem::addr::*;
 
 use ::lib::*;
 use ::alloc::boxed::Box;
