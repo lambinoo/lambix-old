@@ -16,11 +16,15 @@ pub enum MapErr {
     Is4KMapped
 }
 
-pub unsafe fn get_physical_page(addr: VirtAddr) -> Result<PhyAddr> {
-    let entry = get_pt_entry(addr)?;
+pub unsafe fn get_physical_address(vaddr: VirtAddr) -> Result<PhyAddr> {
+    let entry = get_pt_entry(vaddr)?;
     if entry.is_present() {
-        let paddr_mask = ((1 << 52) - 1) & !((1 << 12) - 1);
-        Ok(PhyAddr::from(entry.get_value() & paddr_mask))
+        let low_mask = !((1 << 12) - 1);
+        let paddr_mask = ((1 << 52) - 1) & low_mask;
+        let phy_addr = PhyAddr::from(entry.get_value() & paddr_mask)
+            | (usize::from(vaddr) & !low_mask);
+
+        Ok(phy_addr)
     } else {
         Err(MapErr::NotMapped)
     }
@@ -115,7 +119,7 @@ unsafe fn allocate_if_not_exist(entry: &Entry) {
     if !entry.is_present() {
         let page_table = VirtAddr::from(Box::into_raw(PageTable::new()) as usize);
         entry.set(
-            get_physical_page(page_table).expect("we just allocated it, it has to be mapped"),
+            get_physical_address(page_table).expect("we just allocated it, it has to be mapped"),
             PageTable::default_flags()
         );
     }

@@ -1,4 +1,5 @@
 pub mod memmap;
+pub mod acpi;
 
 use crate::kernel::mem::addr::*;
 use memmap::*;
@@ -39,6 +40,10 @@ impl BootInfo {
             ),
             _phantom: core::marker::PhantomData
         }
+    }
+
+    pub fn get_tag(&self, tag_type: TagType) -> Option<&Tag> {
+        self.tags().filter(|tag| tag.tag_type == tag_type).next()
     }
 
     fn get_ptr(&self) -> *const u8 {
@@ -111,6 +116,7 @@ pub struct InfoHeader {
     _reserved: u32
 }
 
+#[derive(Debug)]
 pub struct Tag {
     pub tag_type: TagType,
     pub size: u32
@@ -124,6 +130,20 @@ impl Tag {
     pub fn as_memmap(&self) -> Option<&MemoryMap> {
         match self.tag_type {
             TagType::MemMap => Some(self.payload()),
+            _ => None
+        }
+    }
+
+    pub fn as_acpi_v1(&self) -> Option<&acpi::ACPIRsdp<acpi::RsdpV1>> {
+        match self.tag_type {
+            TagType::ACPIOldRsdp => Some(self.payload()),
+            _ => None
+        }
+    }
+    
+    pub fn as_acpi_v2(&self) -> Option<&acpi::ACPIRsdp<acpi::RsdpV2>> {
+        match self.tag_type {
+            TagType::ACPIOldRsdp => Some(self.payload()),
             _ => None
         }
     }

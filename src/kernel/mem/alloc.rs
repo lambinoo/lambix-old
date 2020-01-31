@@ -19,7 +19,7 @@ pub fn init() {
 }
 
 pub struct LambixAllocator {
-    inner: Spinlock<Option<InnerAllocator>>
+    inner: StaticSpinlock<Option<InnerAllocator>>
 }
 
 unsafe impl GlobalAlloc for LambixAllocator {
@@ -27,15 +27,13 @@ unsafe impl GlobalAlloc for LambixAllocator {
         if let Some(ref mut allocator) = *self.inner.lock() {
             allocator.alloc(layout)
         } else {
-            panic!("LambixAllocator needs to be initliazed before use");
+            core::ptr::null_mut()
         }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if let Some(ref mut allocator) = *self.inner.lock() {
             allocator.dealloc(ptr, layout);
-        } else {
-            panic!("LambixAllocator needs to be initliazed before use");
         }
     }
 }
@@ -43,7 +41,7 @@ unsafe impl GlobalAlloc for LambixAllocator {
 impl LambixAllocator {
     const fn new() -> LambixAllocator {
         LambixAllocator {
-            inner: Spinlock::new(None)
+            inner: StaticSpinlock::new(None)
         }
     }
 

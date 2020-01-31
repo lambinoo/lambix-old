@@ -12,10 +12,10 @@ use crate::kernel::mem::addr::PhyAddr;
 use core::fmt::{Arguments, Write};
 use core::ptr::NonNull;
 
-use lib::sync::Spinlock;
+use lib::sync::StaticSpinlock;
 
 pub const BASE_ADDR: PhyAddr = PhyAddr::new(0xb8000);
-pub static VGA_BUFFER: Spinlock<VGABuffer> = Spinlock::new(unsafe { 
+pub static VGA_BUFFER: StaticSpinlock<VGABuffer> = StaticSpinlock::new(unsafe { 
     VGABuffer::new(NonNull::new_unchecked(BASE_ADDR.as_mut_ptr()))
 });
 

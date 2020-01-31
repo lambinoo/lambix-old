@@ -1,18 +1,12 @@
-use lib::sync::*;
-
 use crate::kernel::mem::paging::*;
 use crate::kernel::mem::addr::*;
-use crate::kernel::config::*;
+use super::valloc::VALLOC;
 use alloc::alloc::Layout;
 use alloc::boxed::Box;
 
 pub use crate::kernel::mem::paging::Flags;
 
-use core::ops::Range;
-use core::ptr::NonNull;
 use core::mem::ManuallyDrop;
-
-static ALLOCATOR: Spinlock<Option<VAllocator>> = Spinlock::new(None);
 
 /// Map a physical address to the virtual address space. This is highly unsafe as it can lead to manipulating memory in-use by other part of the kernel
 /// on this or another CPU.
@@ -54,7 +48,7 @@ impl<T> VBox<T> {
     pub unsafe fn with_flags(paddr: PhyAddr, flags: Flags) -> VBox<T> {
         let layout = Self::layout();
 
-        if let Some(ref mut allocator) = *ALLOCATOR.lock() {
+        if let Some(ref mut allocator) = *VALLOC.lock() {
             let base_addr = allocator.alloc(layout).expect("failed to allocate virtual memory").as_ptr();
 
             let mut offset = 0;
@@ -123,50 +117,10 @@ impl<T> Drop for VBox<T> {
             unmap4k(VirtAddr::from(base_addr)).expect("unsound state, already allocated vmem not mapped");
         };
 
-        if let Some(ref mut allocator) = *ALLOCATOR.lock() {
+        if let Some(ref mut allocator) = *VALLOC.lock() {
             allocator.dealloc(Self::layout(), base_addr as *mut u8);
         }
     }
 }
 
-
-struct VAllocator {
-    range: Range<NonNull<u8>>,
-    cursor: NonNull<u8>
-}
-
-impl VAllocator {
-    fn new() -> VAllocator {
-        VAllocator {
-            range: NonNull::new(VMALLOC_BASE as _).unwrap()..NonNull::new(VMALLOC_END as _).unwrap(),
-            cursor: NonNull::new(VMALLOC_BASE as _).unwrap()
-        }
-    }
-
-    fn alloc(&mut self, layout: Layout) -> core::result::Result<NonNull<u8>, ()> {
-        let base_addr = self.cursor.as_ptr()
-            .wrapping_add(self.cursor.as_ptr().align_offset(layout.align()));
-
-        let new_cursor = NonNull::new(base_addr.wrapping_add(layout.size())).unwrap();
-
-        if self.range.contains(&new_cursor) {
-            self.cursor = new_cursor;
-            Ok(NonNull::new(base_addr).unwrap())
-        } else {
-            Err(())
-        }
-    }
-
-    fn dealloc(&mut self, _layout: Layout, _ptr: *mut u8) {
-        // TODO do nothing for now but we will have to write a proper allocator later
-    }
-}
-
-
-pub unsafe fn init() {
-    let mut allocator = ALLOCATOR.lock();
-    if allocator.is_none() {
-        *allocator = Some(VAllocator::new());
-    }
-}
 

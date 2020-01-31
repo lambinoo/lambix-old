@@ -1,4 +1,5 @@
 use core::ops::*;
+use core::fmt;
 use core::mem::align_of;
 use core::ptr::NonNull;
 
@@ -23,9 +24,15 @@ macro_rules! op {
 
 macro_rules! address {
     ($name:ident; $type:ty) => {
-        #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
+        #[derive(Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
         #[repr(transparent)]
         pub struct $name(pub usize);
+
+        impl fmt::Debug for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}({:#?})", stringify!($name), self.0 as *const ())
+            }
+        }
 
         impl $name {
             pub const fn new(value: usize) -> Self {

@@ -1,4 +1,5 @@
 use crate::kernel;
+use crate::drivers;
 use crate::kernel_main;
 
 use ::lib::*;
@@ -14,6 +15,7 @@ pub unsafe extern "C" fn kernel_bootstrap() -> ! {
     kernel::mem::setup_memory();
     kernel::idt::setup_idt();
     kernel::apic::setup_apic();
+    drivers::acpi::setup_acpi();
 
     exec_with_new_stack(kernel_main);
 }
@@ -22,7 +24,6 @@ unsafe fn exec_with_new_stack(f: unsafe fn() -> !) -> ! {
     let stack_page: *mut Page = Box::into_raw(Box::new_zeroed().assume_init());
     asm!("movq $0, %rbp" :: "r"(stack_page));
     asm!("movq $0, %rsp" :: "r"(stack_page));
-    enable_interrupts!();
     f();
 }
 

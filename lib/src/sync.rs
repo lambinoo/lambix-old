@@ -1,3 +1,3 @@
-pub mod spinlock;
-pub use spinlock::Spinlock;
+pub mod static_spinlock;
+pub use static_spinlock::StaticSpinlock;
 

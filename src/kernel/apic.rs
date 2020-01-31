@@ -11,7 +11,7 @@ use core::convert::TryFrom;
 use core::sync::atomic::*;
 use ::alloc::vec::Vec;
 
-static APIC_REGS: Spinlock<Vec<APIC>> = Spinlock::new(Vec::new());
+static APIC_REGS: StaticSpinlock<Vec<APIC>> = StaticSpinlock::new(Vec::new());
 
 pub struct APIC {
     handle: VBox<APICRegisters>,
@@ -25,15 +25,23 @@ impl APIC {
             self.get32(APICRegister::ApicID).load(Ordering::SeqCst) >> 24
         ).unwrap()
     }
+
+    pub fn set_spurious_int_handler(&mut self, vector: u8) {
+        self.get32(APICRegister::SpuriousInterruptVector);
+    }
+
+    pub fn set_timer(&mut self, count: usize, periodic: bool) {
+         
+    }
+
+    pub fn end_of_interrupt(&mut self) {
+        self.get32(APICRegister::EndOfInterrupt).store(0, Ordering::SeqCst);
+    }
 }
 
 impl APIC {
     fn get32(&self, register: APICRegister) -> &AtomicU32 {
-        &self.handle.registers[(register as usize) / 4]
-    }
-
-    fn get64(&self, register: APICRegister) -> &AtomicU64 {
-        unsafe { core::mem::transmute(self.get32(register)) }
+        &self.handle.registers[(register as usize) / core::mem::size_of::<APICRegister>()]
     }
 }
 
@@ -106,7 +114,6 @@ pub fn setup_apic() {
     };
 
     APIC_REGS.lock().push(apic);
-
 }
 
 #[inline]

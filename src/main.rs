@@ -11,7 +11,8 @@
     alloc_error_handler,
     new_uninit,
     alloc_layout_extra,
-    naked_functions
+    naked_functions,
+    vec_leak
 )]
 
 extern crate alloc;
@@ -25,7 +26,6 @@ pub mod panic;
 #[no_mangle]
 pub fn kernel_main() -> ! {
     early_kprintln!("kernel_main reached");
-
     loop {
         early_kprintln!("tick");
         unsafe { asm!("hlt"); };
