@@ -100,25 +100,23 @@ extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
     let boot_info = get_boot_info();
 
     let physical_addr = if let Some(rsdp) = boot_info.get_tag(TagType::ACPINewRsdp) {
-        let rsdp = rsdp.as_acpi_v2().unwrap().get_rsdp();
+        let rsdp_addr = VirtAddr::from(rsdp.data().as_ptr());
+        ACPI_PHYSICAL_ADDRESS::try_from(
+            usize::from(unsafe {
+                get_physical_address(rsdp_addr).unwrap()
+            })
+        ).unwrap()
+    } else if let Some(rsdp) = boot_info.get_tag(TagType::ACPIOldRsdp) {
+        let rsdp = VirtAddr::from(rsdp.data().as_ptr());
         ACPI_PHYSICAL_ADDRESS::try_from(
             usize::from(unsafe {
                 get_physical_address(VirtAddr::from(rsdp)).unwrap()
             })
         ).unwrap()
     } else {
-        if let Some(rsdp) = boot_info.get_tag(TagType::ACPIOldRsdp) {
-            let rsdp = rsdp.as_acpi_v1().unwrap().get_rsdp();
-            ACPI_PHYSICAL_ADDRESS::try_from(
-                usize::from(unsafe {
-                    get_physical_address(VirtAddr::from(rsdp)).unwrap()
-                })
-            ).unwrap()
-        } else {
-            let mut acpi_phy_addr = 0;
-            unsafe { AcpiFindRootPointer(&mut acpi_phy_addr as _) };
-            acpi_phy_addr
-        }
+        let mut acpi_phy_addr = 0;
+        unsafe { AcpiFindRootPointer(&mut acpi_phy_addr as _) };
+        acpi_phy_addr
     };
 
     physical_addr

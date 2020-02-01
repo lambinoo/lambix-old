@@ -1,5 +1,4 @@
 pub mod memmap;
-pub mod acpi;
 
 use crate::kernel::mem::addr::*;
 use memmap::*;
@@ -8,6 +7,9 @@ use core::convert::TryFrom;
 use core::ops::Range;
 use core::mem::size_of;
 use core::ptr::NonNull;
+use core::fmt;
+
+use alloc::{vec, vec::Vec};
 
 static mut BOOT_INFO: Option<BootInfo> = None;
 
@@ -42,8 +44,8 @@ impl BootInfo {
         }
     }
 
-    pub fn get_tag(&self, tag_type: TagType) -> Option<&Tag> {
-        self.tags().filter(|tag| tag.tag_type == tag_type).next()
+    pub fn get_tag(&self, tag_type: TagType) -> Option<Tag> {
+        self.tags().filter(|tag| tag.tag_type() == tag_type).next()
     }
 
     fn get_ptr(&self) -> *const u8 {
@@ -53,53 +55,60 @@ impl BootInfo {
 
 impl Clone for BootInfo {
     fn clone(&self) -> BootInfo {
-        use ::alloc::{boxed::Box, *};
+        #[repr(align(16))]
+        #[derive(Copy, Clone)]
+        pub struct BootInfoByte(u8);
 
-        let total_size = self.len();
-
-        let vector_capacity = total_size / size_of::<InfoHeader>()
-            + if total_size % size_of::<BootInfo>() != 0 { 1 } else { 0 };
-
-        let owned_boot_info = vec![0u64; vector_capacity];
-        let boot_info = self.get_ptr();
-
-        unsafe {
-            core::ptr::copy(boot_info, owned_boot_info.as_ptr() as *mut u8, total_size);
+        let data_ptr = self.header.as_ptr() as *const BootInfoByte;
+        let length = self.len();
+        let slice = unsafe {
+            core::slice::from_raw_parts(data_ptr, length)
         };
 
-        let owned_boot_info_ptr = Box::into_raw(owned_boot_info.into_boxed_slice());
-    
-        unsafe {
-            BootInfo::at(NonNull::new(owned_boot_info_ptr as *mut InfoHeader).unwrap())
-        }
+        let mut new_boot_info: Vec<BootInfoByte> = vec![BootInfoByte(0); slice.len()];
+        new_boot_info.copy_from_slice(slice);
+
+        let boot_info = Vec::leak(new_boot_info);
+        let header = NonNull::new(boot_info.as_ptr() as *mut InfoHeader).unwrap();
+        BootInfo { header }
     }
 }
 
 
 pub struct Tags<'t> {
     current_tag: VirtAddr,
-    _phantom: core::marker::PhantomData<&'t Tag>
+    _phantom: core::marker::PhantomData<&'t TagHeader>
 }
 
 impl<'t> Tags<'t> {
     #[inline]
-    fn get_current_tag(&self) -> &'t Tag {
-        unsafe { self.current_tag.to_ref() }
+    fn get_current_tag(&self) -> Tag<'t> {
+        let tag_header_ptr = self.current_tag.as_ptr() as *const TagHeader;
+        let header = unsafe { &*tag_header_ptr };
+        
+        let data_size = usize::try_from(header.size).unwrap() - size_of::<TagHeader>();
+        let tag_data_ptr = tag_header_ptr.wrapping_add(1) as *const u8;
+
+        let data = unsafe {
+            core::slice::from_raw_parts(tag_data_ptr, data_size)
+        };
+
+        Tag { header, data }
     }
 
-    pub fn next_tag(&mut self) {
-        let size = usize::try_from(self.get_current_tag().size).unwrap();
+    fn next_tag(&mut self) {
+        let size = usize::try_from(self.get_current_tag().size()).unwrap();
         let unaligned_ptr = self.current_tag.wrapping_add(size); 
         self.current_tag = unaligned_ptr.align::<u64>();
     }
 }
 
 impl<'t> Iterator for Tags<'t> {
-    type Item = &'t Tag;
+    type Item = Tag<'t>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let current_tag = self.get_current_tag();
-        match current_tag.tag_type {
+        match current_tag.tag_type() {
             TagType::EndTag => None,
             _  => {
                 self.next_tag();
@@ -116,36 +125,42 @@ pub struct InfoHeader {
     _reserved: u32
 }
 
-#[derive(Debug)]
-pub struct Tag {
-    pub tag_type: TagType,
-    pub size: u32
+#[repr(C)]
+struct TagHeader {
+    tag_type: TagType,
+    size: u32,
 }
 
-impl Tag {
-    fn payload<T>(&self) -> &T {
-        unsafe { VirtAddr::from(self).to_ref() }
+pub struct Tag<'t> {
+    header: &'t TagHeader,
+    data: &'t [u8]
+}
+
+impl<'t> Tag<'t> {
+    pub fn tag_type(&self) -> TagType {
+        self.header.tag_type
     }
 
-    pub fn as_memmap(&self) -> Option<&MemoryMap> {
-        match self.tag_type {
-            TagType::MemMap => Some(self.payload()),
-            _ => None
-        }
+    pub fn size(&self) -> usize {
+        usize::try_from(self.header.size).unwrap()
     }
 
-    pub fn as_acpi_v1(&self) -> Option<&acpi::ACPIRsdp<acpi::RsdpV1>> {
-        match self.tag_type {
-            TagType::ACPIOldRsdp => Some(self.payload()),
+    pub fn data(&self) -> &'t [u8] {
+        let data_size =  self.size() - size_of::<TagHeader>();
+        unsafe { core::slice::from_raw_parts(self.data.as_ptr(), data_size) }
+    }
+
+    pub fn as_memmap(&self) -> Option<&'t MemoryMap> {
+        match self.tag_type() {
+            TagType::MemMap => MemoryMap::from_bytes(self.data()),
             _ => None
         }
     }
-    
-    pub fn as_acpi_v2(&self) -> Option<&acpi::ACPIRsdp<acpi::RsdpV2>> {
-        match self.tag_type {
-            TagType::ACPIOldRsdp => Some(self.payload()),
-            _ => None
-        }
+}
+
+impl<'t> fmt::Debug for Tag<'t> { 
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Tag {{ type: {:?}, size: {} }}", self.tag_type(), self.size())
     }
 }
 

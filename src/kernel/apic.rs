@@ -113,18 +113,11 @@ pub fn setup_apic() {
     };
 
     APIC_REGS.lock().push(apic);
+
     let boot_info = crate::boot::multiboot::get_boot_info();
-    let tag = boot_info.get_tag(
-        crate::boot::multiboot::TagType::ACPIOldRsdp
-    ).unwrap().as_acpi_v1().unwrap();
+    let tag = boot_info.get_tag(crate::boot::multiboot::TagType::ACPIOldRsdp).unwrap();
 
-    let ptr = unsafe {
-        crate::kernel::mem::paging::get_physical_address(VirtAddr::from(tag.get_rsdp_ptr()))
-    };
-
-    early_kprintln!("{:#?} => {:?}", tag.get_rsdp_ptr(), ptr);
-
-    early_kprintln!("{:?}", tag);
+    let rdsp_ptr = tag.data();
 }
 
 #[inline]

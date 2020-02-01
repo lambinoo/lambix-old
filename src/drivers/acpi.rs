@@ -1,5 +1,6 @@
-mod acpica_os_layer;
-mod acpica_dbg;
+mod lacpica;
+pub mod tables;
+
 use acpica::*;
 
 pub fn setup_acpi() {

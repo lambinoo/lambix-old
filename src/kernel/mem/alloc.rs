@@ -152,7 +152,8 @@ fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item=PhyA
     let boot_info_range = boot_info.range();
 
     tags.filter_map(|tag| tag.as_memmap())
-        .flat_map(|map| map.entries())
+        .map(|memmap| memmap.entries().iter())
+        .flatten()
         .filter(|mem| mem.mem_type == MemoryType::AvailableRAM)
         .flat_map(|mem| {
             let mem_section_size = usize::try_from(mem.length).unwrap();

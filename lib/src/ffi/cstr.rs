@@ -34,4 +34,3 @@ unsafe fn c_strlen(ptr: *const u8) -> usize {
     computed_size
 }
 
-
