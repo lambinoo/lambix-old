@@ -64,9 +64,10 @@ impl LambixAllocator {
 
     pub unsafe fn add_page_to_memory_pool(&self, page_addr: PhyAddr) {
         let vaddr = self.inner.lock().as_ref().unwrap().memory.end;
+        let page_addr = page_addr & !(PAGE_SIZE - 1);
         map4k(vaddr, page_addr, Flags::PRESENT | Flags::READ_WRITE | Flags::NO_EXECUTE)
             .expect("we shouldn't map over already mapped memory here, something is really wrong");
-        self.inc_mem_pool(PageTable::PAGE_SIZE);
+        self.inc_mem_pool(PAGE_SIZE);
     }
 
     #[inline]

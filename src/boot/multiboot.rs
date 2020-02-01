@@ -199,8 +199,8 @@ pub fn init() {
             BOOT_INFO = Some(boot_info.clone());
             
             let page_size = LALLOC.page_size();
-            let range = BOOT_INFO.unwrap().range();
-            let mut page = PhyAddr::from(BOOT_INFO.unwrap().get_ptr()) &! (page_size - 1);
+            let range = boot_info.range();
+            let mut page = PhyAddr::from(boot_info.get_ptr());
             while usize::from(page) < usize::from(range.end) {
                 LALLOC.add_page_to_memory_pool(page);
                 page = page.wrapping_add(page_size);

@@ -1,5 +1,6 @@
 use super::Tag;
 
+#[derive(Debug)]
 pub struct ACPIRsdp<T> {
     tag: Tag,
     rsdp: T
@@ -16,6 +17,7 @@ impl<T> ACPIRsdp<T> {
 }
 
 #[repr(packed)]
+#[derive(Copy, Clone, Debug)]
 pub struct RsdpV1 {
     pub signature: [u8; 8],
     pub checksum: u8,
@@ -25,6 +27,7 @@ pub struct RsdpV1 {
 }
 
 #[repr(packed)]
+#[derive(Copy, Clone, Debug)]
 pub struct RsdpV2 {
     pub rsdpv1: RsdpV1,
     pub length: u32,

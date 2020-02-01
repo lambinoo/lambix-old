@@ -1,7 +1,6 @@
 use crate::kernel::mem::paging::*;
 use crate::kernel::mem::addr::*;
-use super::valloc::VALLOC;
-use alloc::alloc::Layout;
+use super::vbuffer::VBuffer;
 use alloc::boxed::Box;
 
 pub use crate::kernel::mem::paging::Flags;
@@ -13,7 +12,6 @@ use core::mem::ManuallyDrop;
 /// It can also lead to unaligned read of memory if you are not careful.
 ///
 /// Size of the structure that will be mapped have to be a multiple of the page size.
-#[derive(Debug)]
 pub struct VBox<T> {
     inner_box: ManuallyDrop<Box<T>>
 }
@@ -33,7 +31,7 @@ impl<T> VBox<T> {
      * [`CACHE_DISABLE`]: ../../table/paging/struct.Flags.html#associatedconstant.CACHE_DISABLE
      * [`WRITETHROUGH`]: ../../table/paging/struct.Flags.html#associatedconstant.WRITETHROUGH
      **/
-    pub unsafe fn new(paddr: PhyAddr) -> VBox<T> {
+    pub unsafe fn new(paddr: PhyAddr) -> Result<VBox<T>> {
         VBox::with_flags(paddr, Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH)
     }
 
@@ -45,28 +43,13 @@ impl<T> VBox<T> {
      *
      * [`VBox::new`]: struct.VBox.html#method.new
      **/
-    pub unsafe fn with_flags(paddr: PhyAddr, flags: Flags) -> VBox<T> {
-        let layout = Self::layout();
-
-        if let Some(ref mut allocator) = *VALLOC.lock() {
-            let base_addr = allocator.alloc(layout).expect("failed to allocate virtual memory").as_ptr();
-
-            let mut offset = 0;
-            while offset < layout.size() {
-                map4k(
-                    VirtAddr::from(base_addr.wrapping_add(offset)),
-                    paddr.wrapping_add(offset),
-                    Flags::PRESENT | flags
-                ).expect("failed to map virtual memory for VBox");
-                offset += PAGE_SIZE;
-            }
-
-            VBox {
-                inner_box: ManuallyDrop::new(Box::from_raw(base_addr as *mut T))
-            }
-        } else {
-            panic!("VBox framework wasn't initialized before use");
-        }
+    pub unsafe fn with_flags(paddr: PhyAddr, flags: Flags) -> Result<VBox<T>> {
+        let vbuffer = VBuffer::with_flags(paddr, core::mem::size_of::<T>(), flags)?;
+        Ok(VBox {
+            inner_box: ManuallyDrop::new(Box::from_raw(
+                VBuffer::leak(vbuffer).0 as _
+            ))
+        })
     }
 
     /**
@@ -78,22 +61,18 @@ impl<T> VBox<T> {
     }
 
     pub fn into_raw(mut vb: VBox<T>) -> *mut T {
-        let ptr = vb.inner_box.as_mut() as *mut T;
+        let addr = vb.inner_box.as_mut() as _;
         core::mem::forget(vb);
-        ptr
+        addr
     }
 
-    pub unsafe fn from_raw(p: *mut T) -> VBox<T> {
+    pub unsafe fn from_raw(addr: *mut T) -> VBox<T> {
         VBox {
-            inner_box: ManuallyDrop::new(Box::from_raw(p))
+            inner_box: ManuallyDrop::new(Box::from_raw(addr))
         } 
     }
-
-    #[inline]
-    fn layout() -> Layout {
-        Layout::new::<T>().align_to(PAGE_SIZE).expect("this type can't be accessed through a VBox")
-    }
 }
+
 
 impl<T> core::ops::Deref for VBox<T> {
     type Target = Box<T>;
@@ -101,6 +80,7 @@ impl<T> core::ops::Deref for VBox<T> {
         &self.inner_box
     }
 }
+
 
 impl<T> core::ops::DerefMut for VBox<T> {
     fn deref_mut(&mut self) -> &mut Box<T> {
@@ -114,12 +94,12 @@ impl<T> Drop for VBox<T> {
         let base_addr = self.inner_box.as_mut() as *mut T;
         unsafe {
             core::ptr::drop_in_place(base_addr);
-            unmap4k(VirtAddr::from(base_addr)).expect("unsound state, already allocated vmem not mapped");
         };
 
-        if let Some(ref mut allocator) = *VALLOC.lock() {
-            allocator.dealloc(Self::layout(), base_addr as *mut u8);
-        }
+        let vbuffer = unsafe {
+            VBuffer::from_raw(base_addr as _, core::mem::size_of::<T>());
+        };
+        core::mem::drop(vbuffer);
     }
 }
 

@@ -1,14 +1,17 @@
 use core::convert::TryFrom;
 use core::mem::size_of;
 
+use ::alloc::vec;
+use ::alloc::vec::Vec;
+
+use lib::ffi::cstr::CStr;
+
+use cty::*;
 use acpica::*;
 
-use alloc::vec;
-use alloc::vec::Vec;
-
 use crate::boot::multiboot::{ get_boot_info, TagType };
-use crate::kernel::mem::addr::*;
 use crate::kernel::mem::paging::get_physical_address;
+use crate::kernel::mem::*;
 
 #[no_mangle]
 extern "C" fn AcpiOsAcquireLock() -> () {
@@ -33,7 +36,6 @@ extern "C" fn AcpiOsAllocate(size: ACPI_SIZE) -> *mut [u128] {
         req_size / size_of::<u128>()
     };
 
-#[no_mangle]
     let buffer = vec![0u128; buffer_size];
     Vec::leak(buffer) as _
 }
@@ -98,6 +100,7 @@ extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
     let boot_info = get_boot_info();
 
     let physical_addr = if let Some(rsdp) = boot_info.get_tag(TagType::ACPINewRsdp) {
+        let rsdp = rsdp.as_acpi_v2().unwrap().get_rsdp();
         ACPI_PHYSICAL_ADDRESS::try_from(
             usize::from(unsafe {
                 get_physical_address(VirtAddr::from(rsdp)).unwrap()
@@ -105,6 +108,7 @@ extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
         ).unwrap()
     } else {
         if let Some(rsdp) = boot_info.get_tag(TagType::ACPIOldRsdp) {
+            let rsdp = rsdp.as_acpi_v1().unwrap().get_rsdp();
             ACPI_PHYSICAL_ADDRESS::try_from(
                 usize::from(unsafe {
                     get_physical_address(VirtAddr::from(rsdp)).unwrap()
@@ -117,15 +121,13 @@ extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
         }
     };
 
-    early_kprintln!("acpi get root pointer: 0x{:x}", physical_addr);
-
     physical_addr
 }
 
 
 #[no_mangle]
-extern "C" fn AcpiOsGetThreadId() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsGetThreadId() -> u64 {
+    unimplemented!()
 }
 
 
@@ -149,8 +151,22 @@ extern "C" fn AcpiOsInstallInterruptHandler() -> () {
 
 #[no_mangle]
 extern "C" fn AcpiOsMapMemory(paddr: acpica::ACPI_PHYSICAL_ADDRESS, size: acpica::ACPI_SIZE) -> *mut u8 {
-    early_kprintln!("os map memory paddr: 0x{:x} size: {}", paddr, size);
-    unimplemented!();
+    let vbuffer = unsafe {
+        VBuffer::with_flags(
+            PhyAddr::from(usize::try_from(paddr).unwrap()),
+            usize::try_from(size).unwrap(),
+            Flags::NO_EXECUTE
+        )
+    };
+
+    match vbuffer {
+        Ok(vbuffer) => {
+            VBuffer::leak(vbuffer).0
+        }
+        Err(err) => {
+            core::ptr::null_mut()
+        }
+    }
 }
 
 
@@ -167,8 +183,9 @@ extern "C" fn AcpiOsPredefinedOverride() -> () {
 
 
 #[no_mangle]
-extern "C" fn AcpiOsPrintf() -> () {
-    unimplemented!();
+unsafe extern "C" fn AcpiOsPrintf(format: *const c_char, mut _args: ...) -> () {
+    let cstr = CStr::from_ptr(format).as_str().unwrap_or("not valid utf8");
+    early_kprint!("{}", cstr);
 }
 
 
@@ -251,14 +268,17 @@ extern "C" fn AcpiOsTerminate() -> () {
 
 
 #[no_mangle]
-extern "C" fn AcpiOsUnmapMemory() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsUnmapMemory(addr: *const c_void, size: ACPI_SIZE) {
+    let size = usize::try_from(size).unwrap();
+    core::mem::drop(
+        unsafe { VBuffer::from_raw(addr as _, size) }
+    );
 }
 
 
 #[no_mangle]
-extern "C" fn AcpiOsVprintf() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsVprintf(fmt: *const c_char, mut _va_list: core::ffi::VaList) {
+    early_kprint!("{}", unsafe { CStr::from_ptr(fmt).as_str().unwrap() });
 }
 
 

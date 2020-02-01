@@ -2,7 +2,6 @@ pub mod registers;
 
 use crate::kernel::mem::addr::*;
 use crate::kernel::mem::vbox::*;
-use registers::*;
 
 use lib::*;
 use lib::sync::*;
@@ -26,11 +25,11 @@ impl APIC {
         ).unwrap()
     }
 
-    pub fn set_spurious_int_handler(&mut self, vector: u8) {
+    pub fn set_spurious_int_handler(&mut self, _vector: u8) {
         self.get32(APICRegister::SpuriousInterruptVector);
     }
 
-    pub fn set_timer(&mut self, count: usize, periodic: bool) {
+    pub fn set_timer(&mut self, _count: usize, _periodic: bool) {
          
     }
 
@@ -108,12 +107,24 @@ pub fn setup_apic() {
     );
 
     let apic = APIC {
-        handle: unsafe { VBox::with_flags(phy_addr, Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH | Flags::READ_WRITE) },
+        handle: unsafe { VBox::with_flags(phy_addr, Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH | Flags::READ_WRITE).unwrap() },
         cpu_hw_id: u8::try_from(cpuid!(0x1)[1] >> 24).unwrap(),
         is_bsc: (register[1] & APICRegisters::BSC_BIT) != 0
     };
 
     APIC_REGS.lock().push(apic);
+    let boot_info = crate::boot::multiboot::get_boot_info();
+    let tag = boot_info.get_tag(
+        crate::boot::multiboot::TagType::ACPIOldRsdp
+    ).unwrap().as_acpi_v1().unwrap();
+
+    let ptr = unsafe {
+        crate::kernel::mem::paging::get_physical_address(VirtAddr::from(tag.get_rsdp_ptr()))
+    };
+
+    early_kprintln!("{:#?} => {:?}", tag.get_rsdp_ptr(), ptr);
+
+    early_kprintln!("{:?}", tag);
 }
 
 #[inline]

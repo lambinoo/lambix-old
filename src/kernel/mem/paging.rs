@@ -13,13 +13,14 @@ pub enum MapErr {
     AlreadyMapped,
     NotMapped,
     OutOfMemory,
-    Is4KMapped
+    Is4KMapped,
+    InvalidPhyAddr
 }
 
 pub unsafe fn get_physical_address(vaddr: VirtAddr) -> Result<PhyAddr> {
     let entry = get_pt_entry(vaddr)?;
     if entry.is_present() {
-        let low_mask = !((1 << 12) - 1);
+        let low_mask = !(PAGE_SIZE  - 1);
         let paddr_mask = ((1 << 52) - 1) & low_mask;
         let phy_addr = PhyAddr::from(entry.get_value() & paddr_mask)
             | (usize::from(vaddr) & !low_mask);
@@ -41,21 +42,26 @@ pub unsafe fn get_physical_address(vaddr: VirtAddr) -> Result<PhyAddr> {
 /// You have to ensure that the physical address is 4k-aligned, and doesn't have it's higher
 /// significant bit (the 64th one) set as it's used for NX pages.
 pub unsafe fn map4k(vaddr: VirtAddr, paddr: PhyAddr, flags: Flags)-> Result<()> { 
-    let root_entry = PageTable::get_entry(PageTableType::PML4T, vaddr);
-    allocate_if_not_exist(root_entry);
+    let paddr_mask = ((1 << 52) - 1) & !(PAGE_SIZE - 1);
+    if paddr == (paddr & paddr_mask) {
+        let root_entry = PageTable::get_entry(PageTableType::PML4T, vaddr);
+        allocate_if_not_exist(root_entry);
 
-    let pdpt_entry = PageTable::get_entry(PageTableType::PDPT, vaddr);
-    allocate_if_not_exist(pdpt_entry);
+        let pdpt_entry = PageTable::get_entry(PageTableType::PDPT, vaddr);
+        allocate_if_not_exist(pdpt_entry);
 
-    let pdt_entry = PageTable::get_entry(PageTableType::PDT, vaddr);
-    allocate_if_not_exist(pdt_entry);
+        let pdt_entry = PageTable::get_entry(PageTableType::PDT, vaddr);
+        allocate_if_not_exist(pdt_entry);
 
-    let pt_entry = PageTable::get_entry(PageTableType::PT, vaddr);
-    if !pt_entry.is_present() {
-        pt_entry.set(paddr, flags | Flags::PRESENT);
-        Ok(())
+        let pt_entry = PageTable::get_entry(PageTableType::PT, vaddr);
+        if !pt_entry.is_present() {
+            pt_entry.set(paddr, flags | Flags::PRESENT);
+            Ok(())
+        } else {
+            Err(MapErr::AlreadyMapped)
+        }    
     } else {
-        Err(MapErr::AlreadyMapped)
+        Err(MapErr::InvalidPhyAddr)
     }
 }
 

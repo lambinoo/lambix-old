@@ -8,6 +8,7 @@ edition = "2018"
 bitflags = "1.2.0"
 lib = { path = "lib/" }
 acpica = { path = "acpica/" }
+cty = "0.2.1"
 
 [dependencies.backtrace]
 version = "0.3"

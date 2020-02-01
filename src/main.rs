@@ -12,7 +12,8 @@
     new_uninit,
     alloc_layout_extra,
     naked_functions,
-    vec_leak
+    vec_leak,
+    c_variadic
 )]
 
 extern crate alloc;
