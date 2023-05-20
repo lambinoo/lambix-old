@@ -22,7 +22,8 @@ pub unsafe extern "C" fn kernel_bootstrap() -> ! {
 
 unsafe fn exec_with_new_stack(f: unsafe fn() -> !) -> ! {
     let stack_page: *mut Page = Box::into_raw(Box::new_zeroed().assume_init());
-    core::arch::asm!("movq $0, %rbp" :: "r"(stack_page));
-    core::arch::asm!("movq $0, %rsp" :: "r"(stack_page));
+    core::arch::asm!("mov rbp, {stack}",
+                     "mov rsp, {stack}",
+                     stack = in(reg) stack_page);
     f();
 }

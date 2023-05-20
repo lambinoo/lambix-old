@@ -13,7 +13,7 @@ fn _p(frame: &InterruptStackFrame, errcode: u64, vector: u8) {
     if let Ok(vec) = VectorWithError::try_from(usize::from(vector)) {
         let cr2: usize;
         unsafe {
-            core::arch::asm!("mov $0, cr2" : "=r"(cr2) ::: "intel");
+            core::arch::asm!("mov {}, cr2", out(reg) cr2);
         }
 
         panic!(

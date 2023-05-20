@@ -1,18 +1,18 @@
 #[macro_export]
 macro_rules! int {
     ($vector:expr) => {
-        core::arch::asm!("int $0" :: "N"($vector) :: "volatile")
+        core::arch::asm!("int {}", $vector);
     }
 }
 
 #[macro_export]
 macro_rules! enable_interrupts {
-    () => { core::arch::asm!("sti" :::: "volatile") }
+    () => { core::arch::asm!("sti") }
 }
 
 #[macro_export]
 macro_rules! disable_interrupts {
-    () => { core::arch::asm!("cli" :::: "volatile") }
+    () => { core::arch::asm!("cli") }
 }
 
 #[macro_export]

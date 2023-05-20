@@ -7,12 +7,12 @@ macro_rules! cpuid {
         let edx : u32;
 
         unsafe {
-            core::arch::asm!("push ebx",
+            core::arch::asm!("push rbx",
                              "cpuid",
-                             "mov {ebx_tmp}, ebx",
-                             "pop ebx",
-                             out("eax") eax,
-                             ebx_tmp = out(reg) ebx,
+                             "mov {:e}, ebx",
+                             "pop rbx",
+                             out(reg) ebx,
+                             inout("eax") $addr => eax,
                              out("ecx") ecx,
                              out("edx") edx);
         };

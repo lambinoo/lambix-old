@@ -37,6 +37,7 @@ pde_early_kernel_space:
 
 ;-----------------------
 section .data.init.gdt_table align=4096
+default rel
 gdt_table:
     .null:
         dq 0
@@ -82,6 +83,7 @@ multiboot_header_addr:
 
 ;-----------------------
 section .text32 align=32
+default rel
 bits 32
 
 _start:
@@ -98,7 +100,7 @@ _kernel_start:
     mov [multiboot_header_addr], ebx
     
     ; setup protected mode GDT
-    lgdt [gdt_table.register]
+    lgdt [rel gdt_table.register]
     jmp gdt_table.code:init_paging
 
 init_paging:

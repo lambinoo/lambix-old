@@ -8,7 +8,8 @@
     alloc_layout_extra,
     naked_functions,
     c_variadic,
-    new_uninit
+    new_uninit,
+    const_mut_refs
 )]
 
 extern crate alloc;

@@ -295,14 +295,14 @@ impl IDT {
             size: 0,
             addr: 0 as _,
         };
-        core::arch::asm!("sidt ($0)" : "=r"(&mut old_reg));
+        core::arch::asm!("sidt [{}]", in(reg) &mut old_reg);
 
         let new_idt = IDTRegister {
             size: core::mem::size_of::<IDT>().try_into().unwrap(),
             addr: Box::into_raw(idt),
         };
 
-        core::arch::asm!("lidt ($0)" :: "r"(&new_idt) :: "volatile");
+        core::arch::asm!("lidt [{}]", in(reg) &new_idt);
         old_reg.addr
     }
 

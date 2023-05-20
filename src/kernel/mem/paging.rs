@@ -102,7 +102,7 @@ pub unsafe fn unmap2m(vaddr: VirtAddr) -> Result<()> {
 
 #[inline]
 pub fn invalidate_page(vaddr: VirtAddr) {
-    unsafe { core::arch::asm!("invlpg ($0)" :: "r"(vaddr) : "memory") };
+    unsafe { core::arch::asm!("invlpg [{}]", in(reg) vaddr.0) };
 }
 
 #[inline]
