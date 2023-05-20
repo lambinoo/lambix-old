@@ -2,17 +2,21 @@
 macro_rules! int {
     ($vector:expr) => {
         core::arch::asm!("int {}", $vector);
-    }
+    };
 }
 
 #[macro_export]
 macro_rules! enable_interrupts {
-    () => { core::arch::asm!("sti") }
+    () => {
+        core::arch::asm!("sti")
+    };
 }
 
 #[macro_export]
 macro_rules! disable_interrupts {
-    () => { core::arch::asm!("cli") }
+    () => {
+        core::arch::asm!("cli")
+    };
 }
 
 #[macro_export]

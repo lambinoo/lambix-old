@@ -11,6 +11,6 @@ macro_rules! readmsr {
 #[macro_export]
 macro_rules! writemsr {
     ($addr:expr, $regs:expr) => {
-        unsafe { core::arch::asm!("wrmsr", in("ecx") $addr, in("edx") $regs[0], in("eax") $regs[1]) } 
+        unsafe { core::arch::asm!("wrmsr", in("ecx") $addr, in("edx") $regs[0], in("eax") $regs[1]) }
     }
 }
