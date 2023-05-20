@@ -1,6 +1,6 @@
-use crate::kernel::mem::paging::*;
-use crate::kernel::mem::addr::*;
 use super::vbuffer::VBuffer;
+use crate::kernel::mem::addr::*;
+use crate::kernel::mem::paging::*;
 use alloc::boxed::Box;
 
 pub use crate::kernel::mem::paging::Flags;
@@ -13,7 +13,7 @@ use core::mem::ManuallyDrop;
 ///
 /// Size of the structure that will be mapped have to be a multiple of the page size.
 pub struct VBox<T> {
-    inner_box: ManuallyDrop<Box<T>>
+    inner_box: ManuallyDrop<Box<T>>,
 }
 
 impl<T> VBox<T> {
@@ -32,7 +32,10 @@ impl<T> VBox<T> {
      * [`WRITETHROUGH`]: ../../table/paging/struct.Flags.html#associatedconstant.WRITETHROUGH
      **/
     pub unsafe fn new(paddr: PhyAddr) -> Result<VBox<T>> {
-        VBox::with_flags(paddr, Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH)
+        VBox::with_flags(
+            paddr,
+            Flags::READ_WRITE | Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH,
+        )
     }
 
     /**
@@ -46,9 +49,7 @@ impl<T> VBox<T> {
     pub unsafe fn with_flags(paddr: PhyAddr, flags: Flags) -> Result<VBox<T>> {
         let vbuffer = VBuffer::with_flags(paddr, core::mem::size_of::<T>(), flags)?;
         Ok(VBox {
-            inner_box: ManuallyDrop::new(Box::from_raw(
-                VBuffer::leak(vbuffer).0 as _
-            ))
+            inner_box: ManuallyDrop::new(Box::from_raw(VBuffer::leak(vbuffer).0 as _)),
         })
     }
 
@@ -68,11 +69,10 @@ impl<T> VBox<T> {
 
     pub unsafe fn from_raw(addr: *mut T) -> VBox<T> {
         VBox {
-            inner_box: ManuallyDrop::new(Box::from_raw(addr))
-        } 
+            inner_box: ManuallyDrop::new(Box::from_raw(addr)),
+        }
     }
 }
-
 
 impl<T> core::ops::Deref for VBox<T> {
     type Target = Box<T>;
@@ -81,13 +81,11 @@ impl<T> core::ops::Deref for VBox<T> {
     }
 }
 
-
 impl<T> core::ops::DerefMut for VBox<T> {
     fn deref_mut(&mut self) -> &mut Box<T> {
         &mut self.inner_box
     }
 }
-
 
 impl<T> Drop for VBox<T> {
     fn drop(&mut self) {
@@ -102,5 +100,3 @@ impl<T> Drop for VBox<T> {
         core::mem::drop(vbuffer);
     }
 }
-
-

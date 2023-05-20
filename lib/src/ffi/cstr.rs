@@ -1,9 +1,9 @@
-use cty::c_char;
 use core::str::{self, Utf8Error};
+use cty::c_char;
 
 #[repr(transparent)]
 pub struct CStr {
-    inner: [u8]
+    inner: [u8],
 }
 
 impl CStr {
@@ -23,7 +23,7 @@ impl CStr {
 
     pub unsafe fn as_str(&self) -> Result<&str, Utf8Error> {
         str::from_utf8(self.as_bytes())
-    } 
+    }
 }
 
 unsafe fn c_strlen(ptr: *const u8) -> usize {
@@ -33,4 +33,3 @@ unsafe fn c_strlen(ptr: *const u8) -> usize {
     }
     computed_size
 }
-

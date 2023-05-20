@@ -11,6 +11,5 @@ macro_rules! io_read_port {
         let result: u8;
         core::arch::asm!("in %dx, %al" : "={al}"($result) : "{dx}"($port) :: "volatile");
         result
-    }; 
+    };
 }
-

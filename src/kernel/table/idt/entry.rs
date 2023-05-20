@@ -1,12 +1,12 @@
-use core::marker::PhantomData;
-use core::convert::TryInto;
 use super::*;
+use core::convert::TryInto;
+use core::marker::PhantomData;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Entry<T> {
     entry: EntryInner,
-    t: PhantomData<T>
+    t: PhantomData<T>,
 }
 
 impl<T> Entry<T> {
@@ -38,10 +38,8 @@ impl Entry<HandlerWithError> {
     }
 }
 
-
 #[repr(C)]
-#[derive(Debug)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct EntryInner {
     offset_low: u16,
     selector: u16,
@@ -49,9 +47,8 @@ pub struct EntryInner {
     flags: u8,
     offset_mid: u16,
     offset_high: u32,
-    reserved: u32
+    reserved: u32,
 }
-
 
 #[repr(u8)]
 pub enum DPL {
@@ -61,10 +58,8 @@ pub enum DPL {
     PRIVILEGE3 = 3 << 5,
 }
 
-
 #[repr(u8)]
 pub enum GateType {
     INTERRUPT = 0xe,
-    TRAP = 0xf
+    TRAP = 0xf,
 }
-

@@ -1,9 +1,10 @@
 use std::env;
 use std::iter::IntoIterator;
-use std::path::{ PathBuf, Path };
+use std::path::{Path, PathBuf};
 
-fn list_files_in_directory(directory: &str) -> impl Iterator<Item=PathBuf> {
-    Path::new(&format!("{}/acpica/src", directory)).read_dir()
+fn list_files_in_directory(directory: &str) -> impl Iterator<Item = PathBuf> {
+    Path::new(&format!("{}/acpica/src", directory))
+        .read_dir()
         .expect("acpica C source not present at [root]/acpica/src")
         .into_iter()
         .map(|entry| entry.unwrap())
@@ -16,7 +17,6 @@ fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=acpica.h");
- 
 
     let c_files = list_files_in_directory(&root)
         .filter(|path| path.extension().map_or(false, |f| f == "c"))
@@ -47,7 +47,7 @@ fn main() {
         .expect("Unable to generate acpica bindings");
 
     let out_path = PathBuf::from(&out_dir);
-    bindings.write_to_file(out_path.join("bindings.rs"))
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
         .expect("failed to write bindings");
 }
-

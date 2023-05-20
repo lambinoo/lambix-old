@@ -4,21 +4,21 @@ use lib::sync::StaticSpinlock;
 
 use super::PAGE_SIZE;
 
-use core::ptr::NonNull;
 use core::ops::Range;
+use core::ptr::NonNull;
 
 static VALLOC: StaticSpinlock<Option<VAllocator>> = StaticSpinlock::new(None);
 
 struct VAllocator {
     range: Range<NonNull<u8>>,
-    cursor: NonNull<u8>
+    cursor: NonNull<u8>,
 }
 
 impl VAllocator {
     fn new(vrange: Range<*mut u8>) -> VAllocator {
         VAllocator {
             range: NonNull::new(vrange.start).unwrap()..NonNull::new(vrange.end).unwrap(),
-            cursor: NonNull::new(vrange.start).unwrap()
+            cursor: NonNull::new(vrange.start).unwrap(),
         }
     }
 
@@ -39,10 +39,9 @@ impl VAllocator {
     }
 }
 
-
 pub struct VMem {
     base_addr: NonNull<u8>,
-    page_count: usize
+    page_count: usize,
 }
 
 impl VMem {
@@ -50,7 +49,7 @@ impl VMem {
         if let Some(ref mut allocator) = *VALLOC.lock() {
             Ok(VMem {
                 base_addr: allocator.alloc(page_count)?,
-                page_count
+                page_count,
             })
         } else {
             panic!("vmem has to be initliazed before use");
@@ -66,9 +65,7 @@ impl VMem {
     }
 
     pub fn range(&self) -> Range<*mut u8> {
-        self.base_addr()
-        ..
-        self.base_addr().wrapping_add(PAGE_SIZE * self.page_count())
+        self.base_addr()..self.base_addr().wrapping_add(PAGE_SIZE * self.page_count())
     }
 
     pub fn leak(vmem: VMem) -> (*mut u8, usize) {
@@ -78,7 +75,10 @@ impl VMem {
     }
 
     pub unsafe fn from_raw_parts(base_addr: *mut u8, page_count: usize) -> VMem {
-        VMem { base_addr: NonNull::new(base_addr).unwrap(), page_count }
+        VMem {
+            base_addr: NonNull::new(base_addr).unwrap(),
+            page_count,
+        }
     }
 }
 
@@ -97,4 +97,3 @@ pub unsafe fn init() {
         *allocator = Some(VAllocator::new(vrange));
     }
 }
-

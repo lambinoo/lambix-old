@@ -1,14 +1,14 @@
+use crate::boot::multiboot::{memmap::*, *};
 use crate::kernel::config::*;
-use crate::kernel::table::paging::*;
-use crate::kernel::mem::paging::*;
 use crate::kernel::kernel_range;
 use crate::kernel::mem::addr::*;
-use crate::boot::multiboot::{memmap::*, *};
+use crate::kernel::mem::paging::*;
+use crate::kernel::table::paging::*;
 
-use core::convert::TryFrom;
-use core::ptr::NonNull;
 use core::alloc::{GlobalAlloc, Layout};
+use core::convert::TryFrom;
 use core::ops::Range;
+use core::ptr::NonNull;
 use lib::sync::*;
 
 #[global_allocator]
@@ -19,7 +19,7 @@ pub fn init() {
 }
 
 pub struct LambixAllocator {
-    inner: StaticSpinlock<Option<InnerAllocator>>
+    inner: StaticSpinlock<Option<InnerAllocator>>,
 }
 
 unsafe impl GlobalAlloc for LambixAllocator {
@@ -41,14 +41,16 @@ unsafe impl GlobalAlloc for LambixAllocator {
 impl LambixAllocator {
     const fn new() -> LambixAllocator {
         LambixAllocator {
-            inner: StaticSpinlock::new(None)
+            inner: StaticSpinlock::new(None),
         }
     }
 
     fn init(&self) {
         if self.inner.lock().is_none() {
             let boot_info = unsafe {
-                BootInfo::at(NonNull::new(get_info_header_addr().as_mut_ptr::<InfoHeader>()).unwrap())
+                BootInfo::at(
+                    NonNull::new(get_info_header_addr().as_mut_ptr::<InfoHeader>()).unwrap(),
+                )
             };
 
             let mut available_memory = available_memory_iter(&boot_info);
@@ -65,8 +67,12 @@ impl LambixAllocator {
     pub unsafe fn add_page_to_memory_pool(&self, page_addr: PhyAddr) {
         let vaddr = self.inner.lock().as_ref().unwrap().memory.end;
         let page_addr = page_addr & !(PAGE_SIZE - 1);
-        map4k(vaddr, page_addr, Flags::PRESENT | Flags::READ_WRITE | Flags::NO_EXECUTE)
-            .expect("we shouldn't map over already mapped memory here, something is really wrong");
+        map4k(
+            vaddr,
+            page_addr,
+            Flags::PRESENT | Flags::READ_WRITE | Flags::NO_EXECUTE,
+        )
+        .expect("we shouldn't map over already mapped memory here, something is really wrong");
         self.inc_mem_pool(PAGE_SIZE);
     }
 
@@ -81,7 +87,7 @@ impl LambixAllocator {
         *lock = Some(InnerAllocator::new(base_addr..base_addr));
     }
 
-    unsafe fn add_first_page(&self, available_memory: &mut impl Iterator<Item=PhyAddr>) { 
+    unsafe fn add_first_page(&self, available_memory: &mut impl Iterator<Item = PhyAddr>) {
         let flags = Flags::NO_EXECUTE | Flags::READ_WRITE | Flags::PRESENT;
         let base_addr = VirtAddr::from(PHYSICAL_MEMORY_MAPPING_BASE);
 
@@ -100,7 +106,7 @@ impl LambixAllocator {
         PageTable::get_entry(PageTableType::PDPT, base_addr).set(pdt, flags);
         PageTable::get_entry(PageTableType::PDT, base_addr).set(pt, flags);
         PageTable::get_entry(PageTableType::PT, base_addr).set(page, flags);
-    
+
         self.inc_mem_pool(PageTable::PAGE_SIZE);
     }
 
@@ -109,19 +115,20 @@ impl LambixAllocator {
         let mut allocator = lock.as_mut().unwrap();
         allocator.memory.end = allocator.memory.end.wrapping_add(size);
     }
-
 }
-
 
 #[derive(Debug)]
 struct InnerAllocator {
     memory: Range<VirtAddr>,
-    cursor: VirtAddr
+    cursor: VirtAddr,
 }
 
 impl InnerAllocator {
     const fn new(memory: Range<VirtAddr>) -> InnerAllocator {
-        InnerAllocator { cursor: memory.start, memory }
+        InnerAllocator {
+            cursor: memory.start,
+            memory,
+        }
     }
 
     fn alloc(&mut self, layout: Layout) -> *mut u8 {
@@ -129,7 +136,7 @@ impl InnerAllocator {
         let new_cursor = self.cursor.wrapping_add(layout.size());
 
         if new_cursor <= self.memory.end {
-            self.cursor = new_cursor; 
+            self.cursor = new_cursor;
             cursor.as_mut_ptr()
         } else {
             core::ptr::null_mut()
@@ -146,7 +153,7 @@ unsafe fn zero_page_table(page: PhyAddr) {
     core::ptr::write_bytes(page.as_mut_ptr::<u8>(), 0, PageTable::PAGE_SIZE);
 }
 
-fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item=PhyAddr> + 'a {
+fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item = PhyAddr> + 'a {
     // here, we still have the 1st GB of memory identity-mapped
     let tags = boot_info.tags();
     let boot_info_range = boot_info.range();
@@ -157,7 +164,7 @@ fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item=PhyA
         .filter(|mem| mem.mem_type == MemoryType::AvailableRAM)
         .flat_map(|mem| {
             let mem_section_size = usize::try_from(mem.length).unwrap();
-            let end_addr = mem.base_addr.wrapping_add(mem_section_size) &! PageTable::PAGE_MASK; 
+            let end_addr = mem.base_addr.wrapping_add(mem_section_size) & !PageTable::PAGE_MASK;
             let start_addr = {
                 let addr = mem.base_addr.align::<PageTable>();
                 if addr < end_addr {
@@ -177,10 +184,11 @@ fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item=PhyA
             })
         })
         .filter(move |p| {
-            let page = *p .. p.wrapping_add(PageTable::PAGE_SIZE);
+            let page = *p..p.wrapping_add(PageTable::PAGE_SIZE);
             let kernel_range = kernel_range();
 
-            ((page.start >= PhyAddr::new(usize::from(boot_info_range.end)) || (page.end <= PhyAddr::new(usize::from(boot_info_range.start)))))
+            (page.start >= PhyAddr::new(usize::from(boot_info_range.end))
+                || (page.end <= PhyAddr::new(usize::from(boot_info_range.start))))
                 && ((page.start >= kernel_range.end) || (page.end <= kernel_range.start))
         })
 }
@@ -189,4 +197,3 @@ fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item=PhyA
 fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
     panic!("OOM: failed to allocate {:?}", layout)
 }
-

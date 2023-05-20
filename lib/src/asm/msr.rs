@@ -14,4 +14,3 @@ macro_rules! writemsr {
         core::arch::asm!("wrmsr" :: "{ecx}"($addr), "{edx}"($regs[0]), "{eax}"($regs[1]) :: "volatile")
     }
 }
-

@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! set_cr3 {
     ($value:expr) => {
@@ -17,4 +16,3 @@ macro_rules! get_cr3 {
         }
     }
 }
-

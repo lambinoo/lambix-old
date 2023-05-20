@@ -1,14 +1,14 @@
+use crate::kernel::config::*;
+use crate::kernel::mem::addr::*;
+use ::alloc::boxed::Box;
 use bitflags::*;
 use core::ops::Index;
 use core::sync::atomic::*;
-use crate::kernel::mem::addr::*;
-use crate::kernel::config::*;
-use ::alloc::boxed::Box;
 
 /// An entry from a page translation table providing easy access to atomic read & write
 #[repr(C)]
 pub struct Entry {
-    value: AtomicUsize
+    value: AtomicUsize,
 }
 
 impl Entry {
@@ -38,7 +38,7 @@ impl Entry {
     /// # Safety
     /// `addr` must be a properly masked & `flags` must only contains valid flags for the type of entry
     /// cf. `set_value` for reference.
-    pub unsafe fn set(&self, addr: PhyAddr, flags: Flags) { 
+    pub unsafe fn set(&self, addr: PhyAddr, flags: Flags) {
         self.set_value(usize::from(addr) | flags.bits())
     }
 
@@ -48,12 +48,11 @@ impl Entry {
     }
 }
 
-
 /// A general representation of a page translation table, giving access to it's entries atomically.
-/// Every table is made of `ENTRY_PER_TABLE` 
+/// Every table is made of `ENTRY_PER_TABLE`
 #[repr(align(4096))]
 pub struct PageTable {
-    entries: [Entry; PageTable::ENTRY_COUNT]
+    entries: [Entry; PageTable::ENTRY_COUNT],
 }
 
 impl PageTable {
@@ -66,7 +65,7 @@ impl PageTable {
     pub const ENTRY_COUNT: usize = 1 << Self::IDX_BITS;
 
     /// Size of a normal page
-    pub const PAGE_SIZE: usize   = 1 << Self::PAGE_BITS;
+    pub const PAGE_SIZE: usize = 1 << Self::PAGE_BITS;
 
     pub fn default_flags() -> Flags {
         Flags::PRESENT
@@ -115,8 +114,8 @@ impl PageTable {
     fn table_addr(pdpt: usize, pdt: usize, pt: usize) -> VirtAddr {
         VirtAddr::from(PAGE_MAP_BASE)
             | (pdpt << Self::get_shift(PageTableType::PDPT))
-            | (pdt  << Self::get_shift(PageTableType::PDT))
-            | (pt   << Self::get_shift(PageTableType::PT))
+            | (pdt << Self::get_shift(PageTableType::PDT))
+            | (pt << Self::get_shift(PageTableType::PT))
     }
 
     fn get_table_addr(table_type: PageTableType, addr: VirtAddr) -> VirtAddr {
@@ -124,32 +123,25 @@ impl PageTable {
         match table_type {
             PageTableType::PML4T => Self::table_addr(root_idx, root_idx, root_idx),
 
-            PageTableType::PDPT => {
-                Self::table_addr(
-                    root_idx,
-                    root_idx,
-                    Self::get_index(PageTableType::PML4T, addr)
-                )
-            },
+            PageTableType::PDPT => Self::table_addr(
+                root_idx,
+                root_idx,
+                Self::get_index(PageTableType::PML4T, addr),
+            ),
 
-            PageTableType::PDT => {
-                Self::table_addr(
-                    root_idx,
-                    Self::get_index(PageTableType::PML4T, addr),
-                    Self::get_index(PageTableType::PDPT, addr)
-                )
-            },
+            PageTableType::PDT => Self::table_addr(
+                root_idx,
+                Self::get_index(PageTableType::PML4T, addr),
+                Self::get_index(PageTableType::PDPT, addr),
+            ),
 
-            PageTableType::PT => {
-                Self::table_addr(
-                    Self::get_index(PageTableType::PML4T, addr),
-                    Self::get_index(PageTableType::PDPT, addr),
-                    Self::get_index(PageTableType::PDT, addr)
-                )
-            }
+            PageTableType::PT => Self::table_addr(
+                Self::get_index(PageTableType::PML4T, addr),
+                Self::get_index(PageTableType::PDPT, addr),
+                Self::get_index(PageTableType::PDT, addr),
+            ),
         }
     }
-
 }
 
 impl Index<usize> for PageTable {
@@ -159,18 +151,17 @@ impl Index<usize> for PageTable {
     }
 }
 
-
 /// Different types of page translation tables
 #[derive(Copy, Clone)]
 pub enum PageTableType {
     /// PageMap Level-4 Table
     PML4T,
-    /// Page Directory Pointer Table 
+    /// Page Directory Pointer Table
     PDPT,
     /// Page Directory Table
     PDT,
     /// Page Table
-    PT
+    PT,
 }
 
 impl PageTableType {
@@ -179,16 +170,15 @@ impl PageTableType {
             Self::PML4T => 3,
             Self::PDPT => 2,
             Self::PDT => 1,
-            Self::PT => 0
+            Self::PT => 0,
         }
     }
 }
 
-
 bitflags! {
     /// List of flags available in a page translation table entry
     #[derive(Default)]
-    pub struct Flags : usize { 
+    pub struct Flags : usize {
         const NO_EXECUTE = 1 << 63;
         const PAGE_ATTR = 1 << 12;
         const GLOBAL = 1 << 8;
@@ -203,4 +193,3 @@ bitflags! {
         const PRESENT = 1;
     }
 }
-

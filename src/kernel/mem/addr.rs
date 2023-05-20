@@ -1,6 +1,6 @@
-use core::ops::*;
 use core::fmt;
 use core::mem::align_of;
+use core::ops::*;
 use core::ptr::NonNull;
 
 macro_rules! op {
@@ -12,14 +12,14 @@ macro_rules! op {
                 Self(a as _)
             }
         }
- 
+
         impl $trass<usize> for $name {
             fn $fnass_name(&mut self, rhs: usize) {
                 let result = (*self).$fn_name(rhs);
                 self.0 = result.0 as _;
             }
         }
-    }
+    };
 }
 
 macro_rules! address {
@@ -73,7 +73,7 @@ macro_rules! address {
                 Self(addr as usize)
             }
         }
-        
+
         impl<T> From<*const T> for $name {
             fn from(addr: *const T) -> $name {
                 Self(addr as usize)
@@ -118,7 +118,6 @@ macro_rules! address {
                 &mut *(self.0 as *mut T)
             }
 
-
             pub fn is_aligned(&self, align: usize) -> bool {
                 let addr = usize::from(*self);
                 (addr & (align - 1)) == 0
@@ -133,9 +132,7 @@ macro_rules! address {
             }
 
             pub fn align<T>(&self) -> $name {
-                Self::from(self.wrapping_add(
-                    self.as_ptr::<u8>().align_offset(align_of::<T>())
-                ))
+                Self::from(self.wrapping_add(self.as_ptr::<u8>().align_offset(align_of::<T>())))
             }
 
             pub fn align_to(&self, value: usize) -> $name {
@@ -143,14 +140,12 @@ macro_rules! address {
             }
         }
 
-        
         op!($name, BitOr, BitOrAssign, bitor, bitor_assign);
         op!($name, BitAnd, BitAndAssign, bitand, bitand_assign);
         op!($name, Shl, ShlAssign, shl, shl_assign);
         op!($name, Shr, ShrAssign, shr, shr_assign);
-    }
+    };
 }
 
 address!(PhyAddr; u8);
 address!(VirtAddr; u8);
-

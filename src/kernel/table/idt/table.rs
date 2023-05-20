@@ -1,14 +1,14 @@
 use alloc::boxed::Box;
 
-use core::ops::{ Index, IndexMut };
-use core::mem::transmute;
 use core::convert::TryInto;
+use core::mem::transmute;
+use core::ops::{Index, IndexMut};
 
 use super::*;
 
 #[repr(C)]
 pub struct IDT {
-    entries: [EntryInner; 256]
+    entries: [EntryInner; 256],
 }
 
 impl IDT {
@@ -17,7 +17,7 @@ impl IDT {
     }
 
     pub fn new() -> Box<IDT> {
-        use crate::kernel::table::idt::default::*; 
+        use crate::kernel::table::idt::default::*;
 
         let mut idt = IDT::empty();
         idt.set_entry_new(0, panic_on_0);
@@ -280,24 +280,32 @@ impl IDT {
     }
 
     fn set_entry_new(&mut self, idx: usize, handler: HandlerWithError) {
-        self.get_entry_mut::<HandlerWithError>(idx).set(handler, GateType::INTERRUPT, DPL::PRIVILEGE0, 0x20);
+        self.get_entry_mut::<HandlerWithError>(idx).set(
+            handler,
+            GateType::INTERRUPT,
+            DPL::PRIVILEGE0,
+            0x20,
+        );
     }
 }
 
 impl IDT {
-    pub unsafe fn set_for_this_cpu(idt: Box<IDT>) -> *mut IDT { 
-        let mut old_reg: IDTRegister = IDTRegister { size: 0, addr: 0 as _ };
+    pub unsafe fn set_for_this_cpu(idt: Box<IDT>) -> *mut IDT {
+        let mut old_reg: IDTRegister = IDTRegister {
+            size: 0,
+            addr: 0 as _,
+        };
         core::arch::asm!("sidt ($0)" : "=r"(&mut old_reg));
-        
+
         let new_idt = IDTRegister {
             size: core::mem::size_of::<IDT>().try_into().unwrap(),
-            addr: Box::into_raw(idt)
+            addr: Box::into_raw(idt),
         };
 
         core::arch::asm!("lidt ($0)" :: "r"(&new_idt) :: "volatile");
         old_reg.addr
     }
-    
+
     fn get_entry<T>(&self, idx: usize) -> &Entry<T> {
         unsafe { transmute(&self.entries[idx]) }
     }
@@ -306,7 +314,6 @@ impl IDT {
         unsafe { transmute(&mut self.entries[idx]) }
     }
 }
-
 
 impl Index<Vector> for IDT {
     type Output = Entry<Handler>;
@@ -321,7 +328,6 @@ impl IndexMut<Vector> for IDT {
     }
 }
 
-
 impl Index<VectorWithError> for IDT {
     type Output = Entry<HandlerWithError>;
     fn index(&self, int: VectorWithError) -> &Self::Output {
@@ -335,14 +341,15 @@ impl IndexMut<VectorWithError> for IDT {
     }
 }
 
-
 impl Index<usize> for IDT {
     type Output = Entry<Handler>;
     fn index(&self, int: usize) -> &Self::Output {
-        if int > 31 { 
+        if int > 31 {
             self.get_entry(usize::from(int))
         } else {
-            panic!("All interrupts below 32 are reserved and can't be assigned manually. Panicking.");
+            panic!(
+                "All interrupts below 32 are reserved and can't be assigned manually. Panicking."
+            );
         }
     }
 }
@@ -351,8 +358,10 @@ impl IndexMut<usize> for IDT {
     fn index_mut(&mut self, int: usize) -> &mut Self::Output {
         if int > 31 {
             self.get_entry_mut(usize::from(int))
-        } else { 
-            panic!("All interrupts below 32 are reserved and can't be assigned manually. Panicking.");
+        } else {
+            panic!(
+                "All interrupts below 32 are reserved and can't be assigned manually. Panicking."
+            );
         }
     }
 }
@@ -360,6 +369,5 @@ impl IndexMut<usize> for IDT {
 #[repr(packed)]
 struct IDTRegister {
     size: u16,
-    addr: *mut IDT
+    addr: *mut IDT,
 }
-

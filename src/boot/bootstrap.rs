@@ -1,10 +1,9 @@
-use crate::kernel;
 use crate::drivers;
+use crate::kernel;
 use crate::kernel_main;
 
-use ::lib::*;
 use ::alloc::boxed::Box;
-
+use ::lib::*;
 
 #[repr(align(4096))]
 struct Page([u8; 12000]);
@@ -27,4 +26,3 @@ unsafe fn exec_with_new_stack(f: unsafe fn() -> !) -> ! {
     core::arch::asm!("movq $0, %rsp" :: "r"(stack_page));
     f();
 }
-

@@ -4,7 +4,7 @@ struct RsdpV1Header {
     pub checksum: u8,
     pub oemid: [u8; 6],
     pub revision: u8,
-    pub rsdt_addr: u32
+    pub rsdt_addr: u32,
 }
 
 #[repr(packed)]
@@ -13,18 +13,17 @@ struct RsdpV2Header {
     pub length: u32,
     pub xsdt_addr: u64,
     pub extended_checksum: u8,
-    reserved: [u8; 3]
+    reserved: [u8; 3],
 }
 
 #[repr(packed)]
 pub struct RsdpV1 {
     header: RsdpV1Header,
-    tables_addr: [u32]
+    tables_addr: [u32],
 }
 
 #[repr(packed)]
 pub struct RsdpV2 {
     header: RsdpV2Header,
-    tables_addr: [u64]
+    tables_addr: [u64],
 }
-

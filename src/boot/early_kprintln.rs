@@ -1,4 +1,4 @@
-use core::fmt::{Arguments, Write, Result};
+use core::fmt::{Arguments, Result, Write};
 use lib::*;
 
 struct IOPort(u32);
@@ -17,7 +17,8 @@ impl Write for IOPort {
 
 pub fn write_to_serial(args: Arguments) {
     let mut port = IOPort(0x3F8);
-    port.write_fmt(args).expect("failed to write to serial port");
+    port.write_fmt(args)
+        .expect("failed to write to serial port");
 }
 
 #[macro_export]
@@ -40,4 +41,3 @@ macro_rules! early_kprintln {
         }
     )
 }
-

@@ -22,5 +22,3 @@ pub extern "C" fn AcpiDbDisplayArgumentObject() {
 pub extern "C" fn AcpiDbSignalBreakPoint() {
     unimplemented!("ACPI debugger isn't implemented yet");
 }
-
-

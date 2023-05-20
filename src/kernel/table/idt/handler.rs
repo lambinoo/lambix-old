@@ -10,6 +10,5 @@ pub struct InterruptStackFrame {
     cs: usize,
     rflags: *const (),
     rsp: *const (),
-    ss: usize
+    ss: usize,
 }
-

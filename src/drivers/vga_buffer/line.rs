@@ -1,9 +1,9 @@
-use super::Character;
 use super::buffer::COLUMNS;
+use super::Character;
 
 #[repr(transparent)]
 pub struct Line {
-    chars: [Character; COLUMNS]
+    chars: [Character; COLUMNS],
 }
 
 impl Line {
@@ -11,7 +11,7 @@ impl Line {
         let ptr = &self.chars[idx] as *const Character;
         unsafe { ptr.read_volatile() }
     }
- 
+
     pub fn set_char(&mut self, idx: usize, character: Character) {
         let ptr = &mut self.chars[idx] as *mut Character;
         unsafe { ptr.write_volatile(character) }
@@ -25,4 +25,3 @@ impl Line {
         self.chars.len()
     }
 }
-

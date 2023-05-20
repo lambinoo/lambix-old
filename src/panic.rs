@@ -2,7 +2,7 @@ use core::panic::PanicInfo;
 
 #[cold]
 #[panic_handler]
-pub fn panic(info: &PanicInfo) -> ! { 
+pub fn panic(info: &PanicInfo) -> ! {
     early_kprintln!("\x1B\x74----- [PANIC START HERE] -----");
     early_kprint!("kernel panicked ");
 
@@ -23,4 +23,3 @@ pub fn panic(info: &PanicInfo) -> ! {
 
     loop {}
 }
-

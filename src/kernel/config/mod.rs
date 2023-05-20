@@ -25,4 +25,3 @@ export![
     KERNEL_START = PAGE_MAP_END + _512GB;
     KERNEL_END = KERNEL_START + _1GB / 2;
 ];
-

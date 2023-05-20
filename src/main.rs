@@ -13,11 +13,10 @@
 
 extern crate alloc;
 
-
 #[macro_use]
 pub mod boot;
-pub mod kernel;
 pub mod drivers;
+pub mod kernel;
 pub mod panic;
 
 #[no_mangle]
@@ -25,6 +24,8 @@ pub fn kernel_main() -> ! {
     early_kprintln!("kernel_main reached");
     loop {
         early_kprintln!("tick");
-        unsafe { core::arch::asm!("hlt"); };
+        unsafe {
+            core::arch::asm!("hlt");
+        };
     }
 }

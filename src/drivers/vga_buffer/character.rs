@@ -2,7 +2,7 @@
 #[derive(Clone, Copy)]
 pub struct Character {
     character: u8,
-    color: u8
+    color: u8,
 }
 
 impl Character {
@@ -10,4 +10,3 @@ impl Character {
         Character { character, color }
     }
 }
-

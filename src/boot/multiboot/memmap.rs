@@ -1,17 +1,17 @@
 use crate::kernel::mem::addr::*;
-use core::mem::{ size_of, transmute };
 use core::fmt;
+use core::mem::{size_of, transmute};
 use core::slice;
 
 #[repr(C)]
 struct MemoryMapHeader {
     entry_size: u32,
-    entry_version: u32
+    entry_version: u32,
 }
 
 #[repr(transparent)]
 pub struct MemoryMap {
-    entries: [Memory]
+    entries: [Memory],
 }
 
 impl MemoryMap {
@@ -25,12 +25,10 @@ impl MemoryMap {
 
             if entries_size % entry_size == 0 {
                 Some(unsafe {
-                    transmute(
-                        slice::from_raw_parts(
-                            entries_ptr,
-                            entries_size / entries_size
-                        )
-                    )
+                    transmute(slice::from_raw_parts(
+                        entries_ptr,
+                        entries_size / entries_size,
+                    ))
                 })
             } else {
                 None
@@ -45,16 +43,14 @@ impl MemoryMap {
     }
 }
 
-
 #[repr(C)]
 #[derive(Debug)]
 pub struct Memory {
     pub base_addr: PhyAddr,
     pub length: u64,
     pub mem_type: MemoryType,
-    _reserved: u32
+    _reserved: u32,
 }
-
 
 #[repr(u32)]
 #[derive(Copy, Clone, PartialEq)]
@@ -64,7 +60,7 @@ pub enum MemoryType {
     AvailableRAM = 1,
     ACPIInformation = 3,
     ReservedToPreserve = 4,
-    DefectiveRAM = 5
+    DefectiveRAM = 5,
 }
 
 impl fmt::Debug for MemoryType {
@@ -74,10 +70,9 @@ impl fmt::Debug for MemoryType {
             MemoryType::ACPIInformation => "ACPIInformation",
             MemoryType::ReservedToPreserve => "ReservedToPreserve",
             MemoryType::DefectiveRAM => "DefectiveRAM",
-            _ => "Reserved"
+            _ => "Reserved",
         };
 
         write!(f, "{}", name)
     }
 }
-

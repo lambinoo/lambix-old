@@ -1,7 +1,7 @@
-use core::marker::PhantomData;
-use core::fmt::{Write, Result};
-use core::ptr::NonNull;
 use super::Line;
+use core::fmt::{Result, Write};
+use core::marker::PhantomData;
+use core::ptr::NonNull;
 
 pub const COLUMNS: usize = 80;
 pub const LINES: usize = 25;
@@ -13,7 +13,7 @@ pub struct VGABuffer<'b> {
     column: usize,
     current_color: u8,
     line_sizes: [usize; LINES],
-    _phantom: PhantomData<&'b mut CharacterBuffer>
+    _phantom: PhantomData<&'b mut CharacterBuffer>,
 }
 
 impl<'b> VGABuffer<'b> {
@@ -27,9 +27,9 @@ impl<'b> VGABuffer<'b> {
             column: 0,
             current_color: 7,
             line_sizes: [0; LINES],
-            _phantom: PhantomData
+            _phantom: PhantomData,
         };
-        vga_buffer 
+        vga_buffer
     }
 
     pub fn clear(&mut self) {
@@ -61,14 +61,14 @@ impl<'b> VGABuffer<'b> {
                 let lines = self.buffer.as_mut();
 
                 for j in 0..self.line_sizes[i] {
-                    lines[i-1].set_char(j, lines[i].get_char(j));
+                    lines[i - 1].set_char(j, lines[i].get_char(j));
                 }
 
-                for j in self.line_sizes[i]..self.line_sizes[i-1] {
-                    lines[i-1].set(j, b' ', 0);
+                for j in self.line_sizes[i]..self.line_sizes[i - 1] {
+                    lines[i - 1].set(j, b' ', 0);
                 }
 
-                self.line_sizes[i-1] = self.line_sizes[i];
+                self.line_sizes[i - 1] = self.line_sizes[i];
             }
         }
     }
@@ -96,13 +96,13 @@ impl<'b> VGABuffer<'b> {
             line.set(i, b' ', 0);
         }
         self.line_sizes[LINES - 1] = 0;
-    } 
+    }
 }
 
 impl<'b> Write for VGABuffer<'b> {
     fn write_str(&mut self, s: &str) -> Result {
         let mut chars = s.chars();
-        while let Some(c) = chars.next(){
+        while let Some(c) = chars.next() {
             if c.is_ascii() {
                 match c {
                     '\n' => self.new_line(),
@@ -111,11 +111,10 @@ impl<'b> Write for VGABuffer<'b> {
                             self.set_color(color as u8);
                         }
                     }
-                    c => self.write_byte(c as u8)
+                    c => self.write_byte(c as u8),
                 }
             }
         }
         Ok(())
     }
 }
-

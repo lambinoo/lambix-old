@@ -12,12 +12,20 @@ fn _p(frame: &InterruptStackFrame, errcode: u64, vector: u8) {
 
     if let Ok(vec) = VectorWithError::try_from(usize::from(vector)) {
         let cr2: usize;
-        unsafe { core::arch::asm!("mov $0, cr2" : "=r"(cr2) ::: "intel"); }
-        
-        panic!("uncaught {:?}, aborting!\nerror code: 0x{:x}\nstack frame: {:?}\ncr2: 0x{:x}\n", vec, errcode, frame, cr2);
+        unsafe {
+            core::arch::asm!("mov $0, cr2" : "=r"(cr2) ::: "intel");
+        }
+
+        panic!(
+            "uncaught {:?}, aborting!\nerror code: 0x{:x}\nstack frame: {:?}\ncr2: 0x{:x}\n",
+            vec, errcode, frame, cr2
+        );
     }
 
-    panic!("interrupt {} raised but not handled, aborting\nstack frame: {:?}", vector, frame);
+    panic!(
+        "interrupt {} raised but not handled, aborting\nstack frame: {:?}",
+        vector, frame
+    );
 }
 
 isr! {
@@ -278,4 +286,3 @@ isr! {
     pub fn panic_on_254(frame: &InterruptStackFrame, errcode: u64) { _p(frame, errcode, 254); }
     pub fn panic_on_255(frame: &InterruptStackFrame, errcode: u64) { _p(frame, errcode, 255); }
 }
-

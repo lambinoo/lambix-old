@@ -3,38 +3,35 @@ pub mod registers;
 use crate::kernel::mem::addr::*;
 use crate::kernel::mem::vbox::*;
 
-use lib::*;
 use lib::sync::*;
+use lib::*;
 
+use ::alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::sync::atomic::*;
-use ::alloc::vec::Vec;
 
 static APIC_REGS: StaticSpinlock<Vec<APIC>> = StaticSpinlock::new(Vec::new());
 
 pub struct APIC {
     handle: VBox<APICRegisters>,
     cpu_hw_id: u8,
-    is_bsc: bool
+    is_bsc: bool,
 }
 
 impl APIC {
     pub fn get_id(&self) -> usize {
-        usize::try_from(
-            self.get32(APICRegister::ApicID).load(Ordering::SeqCst) >> 24
-        ).unwrap()
+        usize::try_from(self.get32(APICRegister::ApicID).load(Ordering::SeqCst) >> 24).unwrap()
     }
 
     pub fn set_spurious_int_handler(&mut self, _vector: u8) {
         self.get32(APICRegister::SpuriousInterruptVector);
     }
 
-    pub fn set_timer(&mut self, _count: usize, _periodic: bool) {
-         
-    }
+    pub fn set_timer(&mut self, _count: usize, _periodic: bool) {}
 
     pub fn end_of_interrupt(&mut self) {
-        self.get32(APICRegister::EndOfInterrupt).store(0, Ordering::SeqCst);
+        self.get32(APICRegister::EndOfInterrupt)
+            .store(0, Ordering::SeqCst);
     }
 }
 
@@ -43,7 +40,6 @@ impl APIC {
         &self.handle.registers[(register as usize) / core::mem::size_of::<APICRegister>()]
     }
 }
-
 
 #[repr(usize)]
 enum APICRegister {
@@ -74,13 +70,12 @@ enum APICRegister {
     TimerDivideConfiguration = 0x3e0,
     ExtendedAPICFeature = 0x400,
     ExtendedAPICControl = 0x410,
-    SpecificEndOfInterrupt = 0x420
+    SpecificEndOfInterrupt = 0x420,
 }
-
 
 #[repr(align(4096))]
 struct APICRegisters {
-    registers: [AtomicU32; 1024]
+    registers: [AtomicU32; 1024],
 }
 
 impl APICRegisters {
@@ -91,7 +86,6 @@ impl APICRegisters {
     const ADDR_MASK_LOW: u32 = !((1 << 12) - 1);
 }
 
-
 pub fn setup_apic() {
     disable_pic();
 
@@ -100,22 +94,30 @@ pub fn setup_apic() {
     unsafe {
         writemsr!(APICRegisters::MSR_APIC_BASE_ADDR, register);
     };
-    
+
     let phy_addr = PhyAddr::new(
-        usize::try_from(register[0] & APICRegisters::ADDR_MASK_HIGH).unwrap() |
-        usize::try_from(register[1] & APICRegisters::ADDR_MASK_LOW).unwrap()
+        usize::try_from(register[0] & APICRegisters::ADDR_MASK_HIGH).unwrap()
+            | usize::try_from(register[1] & APICRegisters::ADDR_MASK_LOW).unwrap(),
     );
 
     let apic = APIC {
-        handle: unsafe { VBox::with_flags(phy_addr, Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH | Flags::READ_WRITE).unwrap() },
+        handle: unsafe {
+            VBox::with_flags(
+                phy_addr,
+                Flags::NO_EXECUTE | Flags::CACHE_DISABLE | Flags::WRITETHROUGH | Flags::READ_WRITE,
+            )
+            .unwrap()
+        },
         cpu_hw_id: u8::try_from(cpuid!(0x1)[1] >> 24).unwrap(),
-        is_bsc: (register[1] & APICRegisters::BSC_BIT) != 0
+        is_bsc: (register[1] & APICRegisters::BSC_BIT) != 0,
     };
 
     APIC_REGS.lock().push(apic);
 
     let boot_info = crate::boot::multiboot::get_boot_info();
-    let tag = boot_info.get_tag(crate::boot::multiboot::TagType::ACPIOldRsdp).unwrap();
+    let tag = boot_info
+        .get_tag(crate::boot::multiboot::TagType::ACPIOldRsdp)
+        .unwrap();
 
     let rdsp_ptr = tag.data();
 }
@@ -127,4 +129,3 @@ fn disable_pic() {
         io_write_port!(u8, 0x21, 0xff);
     }
 }
-
