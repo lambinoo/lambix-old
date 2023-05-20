@@ -112,7 +112,7 @@ impl LambixAllocator {
 
     fn inc_mem_pool(&self, size: usize) {
         let mut lock = self.inner.lock();
-        let mut allocator = lock.as_mut().unwrap();
+        let allocator = lock.as_mut().unwrap();
         allocator.memory.end = allocator.memory.end.wrapping_add(size);
     }
 }

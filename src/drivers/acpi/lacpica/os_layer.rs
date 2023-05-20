@@ -143,7 +143,7 @@ extern "C" fn AcpiOsMapMemory(
 
     match vbuffer {
         Ok(vbuffer) => VBuffer::leak(vbuffer).0,
-        Err(err) => core::ptr::null_mut(),
+        Err(_err) => core::ptr::null_mut(),
     }
 }
 

@@ -5,7 +5,7 @@ KERNEL_NAME=lambix
 TARGET_TRIPLE=x86_64-unknown-$(KERNEL_NAME)
 
 # binaries
-GRUB_MKRESCUE = grub-mkrescue
+GRUB_MKRESCUE = grub2-mkrescue
 QEMU=qemu-system-x86_64
 GDB=gdb
 
@@ -19,7 +19,7 @@ ifndef RUSTFLAGS
 endif
 
 # path
-BUILD_DIR = build
+BUILD_DIR = target
 LINKER_SCRIPT = linker.ld
 KERNEL = target/$(TARGET_TRIPLE)/$(PROFILE)/$(KERNEL_NAME)
 KERNEL_ISO = $(BUILD_DIR)/isodir/boot/$(KERNEL_NAME)
@@ -33,13 +33,13 @@ endif
 
 build-iso: build symbols
 	mkdir -p $(BUILD_DIR)/isodir/boot/grub
-	cp $(KERNEL) $(KERNEL_ISO) 
-	cp $(BUILD_DIR)/grub.cfg $(BUILD_DIR)/isodir/boot/grub
+	cp $(KERNEL) $(KERNEL_ISO)
+	cp grub.cfg $(BUILD_DIR)/isodir/boot/grub
 	$(GRUB_MKRESCUE) -o $(BUILD_DIR)/$(KERNEL_NAME).iso $(BUILD_DIR)/isodir 2> $(BUILD_DIR)/grub_mkrescue.log 
 
 # Build the kernel
 build:
-	RUSTFLAGS=$(RUSTFLAGS) cargo xbuild --target=$(shell pwd)/$(TARGET_TRIPLE).json $(CARGO_FLAGS)
+	RUSTFLAGS=$(RUSTFLAGS) cargo build --target=$(shell pwd)/$(TARGET_TRIPLE).json $(CARGO_FLAGS)
 
 check:
 	RUSTFLAGS=$(RUSTFLAGS) cargo check

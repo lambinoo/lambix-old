@@ -119,7 +119,7 @@ pub fn setup_apic() {
         .get_tag(crate::boot::multiboot::TagType::ACPIOldRsdp)
         .unwrap();
 
-    let rdsp_ptr = tag.data();
+    let _rdsp_ptr = tag.data();
 }
 
 #[inline]
