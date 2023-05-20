@@ -5,6 +5,7 @@ use crate::kernel_main;
 use ::lib::*;
 use ::alloc::boxed::Box;
 
+
 #[repr(align(4096))]
 struct Page([u8; 12000]);
 
@@ -22,8 +23,8 @@ pub unsafe extern "C" fn kernel_bootstrap() -> ! {
 
 unsafe fn exec_with_new_stack(f: unsafe fn() -> !) -> ! {
     let stack_page: *mut Page = Box::into_raw(Box::new_zeroed().assume_init());
-    asm!("movq $0, %rbp" :: "r"(stack_page));
-    asm!("movq $0, %rsp" :: "r"(stack_page));
+    core::arch::asm!("movq $0, %rbp" :: "r"(stack_page));
+    core::arch::asm!("movq $0, %rsp" :: "r"(stack_page));
     f();
 }
 

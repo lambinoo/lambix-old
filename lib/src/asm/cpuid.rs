@@ -7,7 +7,7 @@ macro_rules! cpuid {
         let edx : u32;
 
         unsafe {
-            asm!("cpuid"
+            core::arch::asm!("cpuid"
                 : "={eax}"(eax), "={ebx}"(ebx), "={ecx}"(ecx), "={edx}"(edx)
                 : "{eax}"($addr));
         };

@@ -287,14 +287,14 @@ impl IDT {
 impl IDT {
     pub unsafe fn set_for_this_cpu(idt: Box<IDT>) -> *mut IDT { 
         let mut old_reg: IDTRegister = IDTRegister { size: 0, addr: 0 as _ };
-        asm!("sidt ($0)" : "=r"(&mut old_reg));
+        core::arch::asm!("sidt ($0)" : "=r"(&mut old_reg));
         
         let new_idt = IDTRegister {
             size: core::mem::size_of::<IDT>().try_into().unwrap(),
             addr: Box::into_raw(idt)
         };
 
-        asm!("lidt ($0)" :: "r"(&new_idt) :: "volatile");
+        core::arch::asm!("lidt ($0)" :: "r"(&new_idt) :: "volatile");
         old_reg.addr
     }
     

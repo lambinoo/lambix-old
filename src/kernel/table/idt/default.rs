@@ -12,7 +12,7 @@ fn _p(frame: &InterruptStackFrame, errcode: u64, vector: u8) {
 
     if let Ok(vec) = VectorWithError::try_from(usize::from(vector)) {
         let cr2: usize;
-        unsafe { asm!("mov $0, cr2" : "=r"(cr2) ::: "intel"); }
+        unsafe { core::arch::asm!("mov $0, cr2" : "=r"(cr2) ::: "intel"); }
         
         panic!("uncaught {:?}, aborting!\nerror code: 0x{:x}\nstack frame: {:?}\ncr2: 0x{:x}\n", vec, errcode, frame, cr2);
     }
