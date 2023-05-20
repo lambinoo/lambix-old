@@ -22,6 +22,6 @@
     "executables": true,
     "disable-redzone": true,
     "linker-is-gnu": true,
-    "position_independent_executables": true,
+    "position-independent-executables": true,
     "panic-strategy": "abort"
 }

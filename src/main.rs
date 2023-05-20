@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 #![feature(
-    const_fn,
     asm,
     format_args_nl,
     abi_x86_interrupt,

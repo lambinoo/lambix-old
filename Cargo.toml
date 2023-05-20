@@ -10,10 +10,6 @@ lib = { path = "lib/" }
 acpica = { path = "acpica/" }
 cty = "0.2.1"
 
-[dependencies.backtrace]
-version = "0.3"
-default-features = false
-
 [build-dependencies]
 sha1 = "0.6"
 
@@ -26,4 +22,3 @@ opt-level = 1
 panic = 'abort'
 incremental = true
 debug = true
-
