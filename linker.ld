@@ -1,22 +1,8 @@
 ENTRY(_start)
 
-__eh_frame_hdr_start = ADDR(.eh_frame_hdr);
-__eh_frame_hdr_end = ADDR(.eh_frame_hdr) + SIZEOF(.eh_frame_hdr);
-__eh_frame_start = ADDR(.eh_frame);
-__eh_frame_end = ADDR(.eh_frame) + SIZEOF(.eh_frame);
-
-
 SECTIONS {
     . = 2M;
     kernel_start_addr = .;
-
-    .eh_frame_hdr : {
-        *(.eh_frame_hdr, .eh_frame_hdr.*)
-    }
-
-    .eh_frame : {
-        *(.eh_frame, .eh_frame.*)
-    }
 
     .multiboot2 :  {
         KEEP(*(.multiboot2))
@@ -34,6 +20,18 @@ SECTIONS {
     .bss : {
         *(COMMON)
         *(.bss, .bss.*)
+    }
+
+    . = ALIGN(8);
+    PROVIDE(__eh_frame_hdr = .);
+    .eh_frame_hdr : {
+	    KEEP (*(.eh_frame_hdr)) *(.eh_frame_hdr.*)
+    }
+
+    . = ALIGN(8);
+    PROVIDE(__eh_frame = .);
+    .eh_frame : {
+	    KEEP (*(.eh_frame)) *(.eh_frame.*)
     }
 
     .text : {

@@ -15,6 +15,13 @@ pub unsafe extern "C" fn kernel_bootstrap() -> ! {
     kernel::mem::setup_memory();
     kernel::idt::setup_idt();
     kernel::apic::setup_apic();
+
+    early_kprintln!(
+        "eh_frame={:?}, eh_frame_hdr={:?}",
+        kernel::get_eh_frame_ptr(),
+        kernel::get_eh_frame_hdr_ptr()
+    );
+
     drivers::acpi::setup_acpi();
 
     exec_with_new_stack(kernel_main);

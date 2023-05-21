@@ -42,8 +42,7 @@ impl<T> StaticSpinlock<T> {
         let (current, new) = (false, true);
         if self
             .locked
-            .compare_and_swap(current, new, Ordering::Acquire)
-            == current
+            .compare_exchange(current, new, Ordering::Acquire, Ordering::Acquire).is_ok()
         {
             Some(StaticSpinlockGuard { lock: self })
         } else {

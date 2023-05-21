@@ -8,8 +8,19 @@ use core::ops::Range;
 use mem::addr::PhyAddr;
 
 extern "C" {
-    static kernel_start_addr: u8;
-    static kernel_end_addr: u8;
+    static kernel_start_addr: usize;
+    static kernel_end_addr: usize;
+
+    static __eh_frame_hdr: usize;
+    static __eh_frame: usize;
+}
+
+pub fn get_eh_frame_hdr_ptr() -> *const () {
+    return unsafe { __eh_frame_hdr as *const () };
+}
+
+pub fn get_eh_frame_ptr() -> *const () {
+    return unsafe { __eh_frame as *const () };
 }
 
 pub fn kernel_range() -> Range<PhyAddr> {

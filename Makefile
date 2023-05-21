@@ -64,5 +64,5 @@ debug:
 		-ex "symbol-file $(KERNEL_ISO)" \
 
 run: build-iso
-	$(QEMU) $(QEMU_FLAGS) -serial stdio -vga std
+	$(QEMU) $(QEMU_FLAGS) -serial stdio -vga none
 

@@ -1,27 +1,22 @@
 use core::convert::TryFrom;
-use core::ffi::{VaList, VaListImpl};
+use core::ffi::VaList;
 use core::mem::size_of;
-use core::panic;
 
 use core::fmt;
 
 use ::alloc::vec;
 use ::alloc::vec::Vec;
 
-use lib::ffi::cstr::CStr;
-
 use acpica::*;
 use core::ffi::*;
+use lib::{io_read_port, io_write_port};
 
+use crate::kernel::mem::*;
 use printf_compat::{format, output};
 
-use crate::boot::multiboot::{get_boot_info, TagType};
-use crate::kernel::mem::paging::get_physical_address;
-use crate::kernel::mem::*;
-
 #[no_mangle]
-extern "C" fn AcpiOsAcquireLock() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsAcquireLock() -> ACPI_STATUS {
+    0
 }
 
 #[no_mangle]
@@ -40,13 +35,6 @@ extern "C" fn AcpiOsAllocate(size: ACPI_SIZE) -> *mut c_void {
     };
 
     let buffer = vec![0u128; buffer_size];
-    early_kprintln!(
-        "AcpiOsAllocate: {:X?} ({}/{} bytes, requested={})",
-        buffer.as_ptr(),
-        size,
-        buffer.len() * size_of::<u128>(),
-        size
-    );
     Vec::leak(buffer).as_ptr() as _
 }
 
@@ -81,8 +69,12 @@ extern "C" fn AcpiOsDeleteSemaphore() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsEnterSleep() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsEnterSleep(
+    SleepState: UINT8,
+    RegaValue: UINT32,
+    RegbValue: UINT32,
+) -> ACPI_STATUS {
+    0
 }
 
 #[no_mangle]
@@ -91,21 +83,20 @@ extern "C" fn AcpiOsExecute() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsFree() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsFree(_ptr: *mut c_void) -> ACPI_STATUS {
+    0 // TODO: proper allocator is needed..
 }
 
 #[no_mangle]
 extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
     let mut rsdp_pointer: ACPI_PHYSICAL_ADDRESS = 0;
     unsafe { AcpiFindRootPointer(&mut rsdp_pointer) };
-    early_kprintln!("RSDP Address {:?}", rsdp_pointer as *const u64);
     rsdp_pointer
 }
 
 #[no_mangle]
 extern "C" fn AcpiOsGetThreadId() -> u64 {
-    unimplemented!()
+    0
 }
 
 #[no_mangle]
@@ -143,38 +134,28 @@ extern "C" fn AcpiOsMapMemory(
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsPhysicalTableOverride() -> () {
-    unimplemented!();
-}
-
-#[no_mangle]
-extern "C" fn AcpiOsPredefinedOverride() -> () {
-    unimplemented!();
-}
-
-unsafe fn _handle_format(citer: &mut core::str::Chars, args: &mut VaList, fmt: &str) {
-    while let Some(c) = citer.next() {
-        match c {
-            '%' => early_kprint!("%"),
-            '0'..='9' | '.' | '-' => continue,
-            'X' => early_kprint!("{:X}", args.arg::<c_uint>()),
-            'x' => early_kprint!("{:x}", args.arg::<c_uint>()),
-            'd' | 'i' => early_kprint!("{}", args.arg::<c_int>()),
-            's' => {
-                let ptr = args.arg::<*const c_char>();
-                early_kprint!("[{:?}]", ptr);
-
-                let str = CStr::from_ptr(ptr);
-                early_kprint!("{}", str.as_str().unwrap())
-            }
-            _ => unimplemented!("Printf ACPI: {} is not handled (full format: {})", c, fmt),
-        }
-        break;
+extern "C" fn AcpiOsPhysicalTableOverride(
+    ExistingTable: *mut ACPI_TABLE_HEADER,
+    NewAddress: *mut ACPI_PHYSICAL_ADDRESS,
+    NewTableLength: *mut UINT32,
+) -> () {
+    unsafe {
+        *NewAddress = 0;
+        *NewTableLength = 0;
     }
 }
 
-unsafe fn _vprintf_impl(format: *const c_char, mut args: VaList) {
-    let cstr = CStr::from_ptr(format).as_str().unwrap_or("not valid utf8");
+#[no_mangle]
+extern "C" fn AcpiOsPredefinedOverride(
+    PredefinedObject: *mut ACPI_PREDEFINED_NAMES,
+    NewValue: *mut ACPI_STRING,
+) -> () {
+    unsafe {
+        *NewValue = core::ptr::null_mut() as ACPI_STRING;
+    };
+}
+
+unsafe fn _vprintf_impl(fmt: *const c_char, args: VaList) {
     struct Data;
     impl fmt::Write for Data {
         fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -185,7 +166,7 @@ unsafe fn _vprintf_impl(format: *const c_char, mut args: VaList) {
         }
     }
 
-    format(format, args, output::fmt_write(&mut Data));
+    format(fmt, args, output::fmt_write(&mut Data));
 }
 
 #[no_mangle]
@@ -210,13 +191,31 @@ extern "C" fn AcpiOsReadPciConfiguration() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsReadPort() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsReadPort(
+    Address: ACPI_IO_ADDRESS,
+    Value: *mut UINT32,
+    Width: UINT32,
+) -> ACPI_STATUS {
+    unsafe {
+        *Value = 0;
+        *Value = match Width {
+            8 => io_read_port!(u8, Address) as u32,
+            16 => io_read_port!(u16, Address) as u32,
+            32 => io_read_port!(u32, Address) as u32,
+            _ => {
+                return 1;
+            }
+        };
+
+        early_kprintln!("Read port: 0x{:x} {} => {:?}", Address, Width, *Value);
+    }
+
+    0
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsReleaseLock() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsReleaseLock() -> ACPI_STATUS {
+    0
 }
 
 #[no_mangle]
@@ -235,8 +234,8 @@ extern "C" fn AcpiOsSignal() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsSignalSemaphore() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsSignalSemaphore(Handle: *const (), Units: UINT32) -> ACPI_STATUS {
+    1
 }
 
 #[no_mangle]
@@ -250,8 +249,13 @@ extern "C" fn AcpiOsStall() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsTableOverride() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsTableOverride(
+    ExistingTable: *const ACPI_TABLE_HEADER,
+    NewTable: *mut *const ACPI_TABLE_HEADER,
+) -> () {
+    unsafe {
+        *NewTable = ExistingTable;
+    };
 }
 
 #[no_mangle]
@@ -277,8 +281,12 @@ extern "C" fn AcpiOsWaitEventsComplete() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsWaitSemaphore() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsWaitSemaphore(
+    Handle: *mut c_void,
+    Units: UINT32,
+    Timeout: UINT16,
+) -> ACPI_STATUS {
+    0
 }
 
 #[no_mangle]
@@ -292,6 +300,22 @@ extern "C" fn AcpiOsWritePciConfiguration() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsWritePort() -> () {
-    unimplemented!();
+extern "C" fn AcpiOsWritePort(
+    Address: ACPI_IO_ADDRESS,
+    Value: UINT32,
+    Width: UINT32,
+) -> ACPI_STATUS {
+    unsafe {
+        early_kprintln!("Write port: 0x{:x} {} <= {:?}", Address, Width, Value);
+        match Width {
+            8 => io_write_port!(u8, Address, Value),
+            16 => io_write_port!(u16, Address, Value),
+            32 => io_write_port!(u8, Address, Value),
+            _ => {
+                return 1;
+            }
+        }
+    }
+
+    0
 }

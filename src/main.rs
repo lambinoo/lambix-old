@@ -12,6 +12,9 @@
     const_mut_refs
 )]
 
+use lib::disable_interrupts;
+
+extern crate acpica;
 extern crate alloc;
 
 #[macro_use]
@@ -20,9 +23,18 @@ pub mod drivers;
 pub mod kernel;
 pub mod panic;
 
+fn shutdown() {
+    unsafe {
+        acpica::AcpiEnterSleepStatePrep(5);
+        disable_interrupts!();
+        acpica::AcpiEnterSleepState(5);
+    }
+}
+
 #[no_mangle]
 pub fn kernel_main() -> ! {
     early_kprintln!("kernel_main reached");
+
     loop {
         early_kprintln!("tick");
         unsafe {

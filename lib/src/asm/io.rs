@@ -8,8 +8,26 @@ macro_rules! io_write_port {
 #[macro_export]
 macro_rules! io_read_port {
     (u8, $port:expr) => {
-        let result: u8;
-        core::arch::asm!("in dx, al", in("dx") $port, out("al") result);
+        {
+            let result: u8;
+            core::arch::asm!("in al, dx", in("dx") $port, out("al") result);
+            result
+        }
+    };
+
+    (u16, $port:expr) => {
+        {
+            let result: u16;
+        core::arch::asm!("in ax, dx", in("dx") $port, out("ax") result);
         result
+        }
+    };
+
+    (u32, $port:expr) => {
+        {
+            let result: u32;
+            core::arch::asm!("in eax, dx", in("dx") $port, out("eax") result);
+            result
+        }
     };
 }
