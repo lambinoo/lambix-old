@@ -53,7 +53,9 @@ impl LambixAllocator {
                 )
             };
 
-            let mut available_memory = available_memory_iter(&boot_info);
+            let mut available_memory = available_memory_iter(&boot_info)
+                .skip(1)
+                .inspect(|d| early_kprintln!("alloc: {:?}", d));
             unsafe {
                 self.create_empty_allocator();
                 self.add_first_page(&mut available_memory);
@@ -162,6 +164,7 @@ fn available_memory_iter<'a>(boot_info: &'a BootInfo) -> impl Iterator<Item = Ph
         .map(|memmap| memmap.entries().iter())
         .flatten()
         .filter(|mem| mem.mem_type == MemoryType::AvailableRAM)
+        .inspect(|data| early_kprintln!("{:?}", data))
         .flat_map(|mem| {
             let mem_section_size = usize::try_from(mem.length).unwrap();
             let end_addr = mem.base_addr.wrapping_add(mem_section_size) & !PageTable::PAGE_MASK;

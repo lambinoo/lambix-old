@@ -41,7 +41,6 @@ fn main() {
 
     let bindings = bindgen::Builder::default()
         .header(&format!("{}/acpica.h", root))
-        .ctypes_prefix("::cty")
         .use_core()
         .generate()
         .expect("Unable to generate acpica bindings");

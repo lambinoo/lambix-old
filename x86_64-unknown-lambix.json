@@ -12,11 +12,10 @@
     "cpu": "x86-64",
     "pre-link-args": {
         "gcc": [
-            "-z,noexecstack",
             "-Tlinker.ld",
 	    "-nostdlib",
     	    "-ffreestanding"
-        ]    
+        ] 
     },
     "features": "-sse,-mmx,+soft-float",
     "executables": true,

@@ -7,7 +7,7 @@ use core::convert::TryFrom;
 /// Panic for interrupt shortcode, never inline so the footprint of this section is minimal
 fn _p(frame: &InterruptStackFrame, errcode: u64, vector: u8) {
     if let Ok(vec) = Vector::try_from(usize::from(vector)) {
-        panic!("uncaught {:?}, aborting!\nstack frame: {:?}", vec, frame);
+        panic!("uncaught {:?}, aborting!\nstack frame: {:#?}", vec, frame);
     }
 
     if let Ok(vec) = VectorWithError::try_from(usize::from(vector)) {

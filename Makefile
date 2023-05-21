@@ -25,7 +25,7 @@ KERNEL = target/$(TARGET_TRIPLE)/$(PROFILE)/$(KERNEL_NAME)
 KERNEL_ISO = $(BUILD_DIR)/isodir/boot/$(KERNEL_NAME)
 
 # debug
-QEMU_FLAGS=-vga std -cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -serial file:$(KERNEL_NAME).log -m 4G -smp 4
+QEMU_FLAGS=-cdrom "$(BUILD_DIR)/$(KERNEL_NAME).iso" --enable-kvm -no-reboot -no-shutdown -m 4G -smp 4
 
 ifeq ($(PROFILE),release)
     CARGO_FLAGS = --release
@@ -60,9 +60,9 @@ rebuild: clean build
 
 debug:
 	$(GDB) \
-		-ex "target remote | $(QEMU) $(QEMU_FLAGS) -S -gdb stdio -monitor pty" \
+		-ex "target remote | $(QEMU) $(QEMU_FLAGS) -S -gdb stdio -monitor pty -serial file:lambix.log" \
 		-ex "symbol-file $(KERNEL_ISO)" \
 
-run:
-	$(QEMU) $(QEMU_FLAGS) -monitor stdio -S
+run: build-iso
+	$(QEMU) $(QEMU_FLAGS) -serial stdio -vga std
 

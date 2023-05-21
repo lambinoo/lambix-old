@@ -1,5 +1,9 @@
 use core::convert::TryFrom;
+use core::ffi::{VaList, VaListImpl};
 use core::mem::size_of;
+use core::panic;
+
+use core::fmt;
 
 use ::alloc::vec;
 use ::alloc::vec::Vec;
@@ -7,7 +11,9 @@ use ::alloc::vec::Vec;
 use lib::ffi::cstr::CStr;
 
 use acpica::*;
-use cty::*;
+use core::ffi::*;
+
+use printf_compat::{format, output};
 
 use crate::boot::multiboot::{get_boot_info, TagType};
 use crate::kernel::mem::paging::get_physical_address;
@@ -24,8 +30,7 @@ extern "C" fn AcpiOsAcquireObject() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsAllocate(size: ACPI_SIZE) -> *mut [u128] {
-    early_kprintln!("allocating {} bytes for acpi", size);
+extern "C" fn AcpiOsAllocate(size: ACPI_SIZE) -> *mut c_void {
     let req_size = usize::try_from(size).unwrap();
 
     let buffer_size = if req_size % size_of::<u128>() != 0 {
@@ -35,7 +40,14 @@ extern "C" fn AcpiOsAllocate(size: ACPI_SIZE) -> *mut [u128] {
     };
 
     let buffer = vec![0u128; buffer_size];
-    Vec::leak(buffer) as _
+    early_kprintln!(
+        "AcpiOsAllocate: {:X?} ({}/{} bytes, requested={})",
+        buffer.as_ptr(),
+        size,
+        buffer.len() * size_of::<u128>(),
+        size
+    );
+    Vec::leak(buffer).as_ptr() as _
 }
 
 #[no_mangle]
@@ -85,27 +97,10 @@ extern "C" fn AcpiOsFree() -> () {
 
 #[no_mangle]
 extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
-    let boot_info = get_boot_info();
-
-    let physical_addr = if let Some(rsdp) = boot_info.get_tag(TagType::ACPINewRsdp) {
-        let rsdp_addr = VirtAddr::from(rsdp.data().as_ptr());
-        ACPI_PHYSICAL_ADDRESS::try_from(usize::from(unsafe {
-            get_physical_address(rsdp_addr).unwrap()
-        }))
-        .unwrap()
-    } else if let Some(rsdp) = boot_info.get_tag(TagType::ACPIOldRsdp) {
-        let rsdp = VirtAddr::from(rsdp.data().as_ptr());
-        ACPI_PHYSICAL_ADDRESS::try_from(usize::from(unsafe {
-            get_physical_address(VirtAddr::from(rsdp)).unwrap()
-        }))
-        .unwrap()
-    } else {
-        let mut acpi_phy_addr = 0;
-        unsafe { AcpiFindRootPointer(&mut acpi_phy_addr as _) };
-        acpi_phy_addr
-    };
-
-    physical_addr
+    let mut rsdp_pointer: ACPI_PHYSICAL_ADDRESS = 0;
+    unsafe { AcpiFindRootPointer(&mut rsdp_pointer) };
+    early_kprintln!("RSDP Address {:?}", rsdp_pointer as *const u64);
+    rsdp_pointer
 }
 
 #[no_mangle]
@@ -157,10 +152,46 @@ extern "C" fn AcpiOsPredefinedOverride() -> () {
     unimplemented!();
 }
 
-#[no_mangle]
-unsafe extern "C" fn AcpiOsPrintf(format: *const c_char, mut _args: ...) -> () {
+unsafe fn _handle_format(citer: &mut core::str::Chars, args: &mut VaList, fmt: &str) {
+    while let Some(c) = citer.next() {
+        match c {
+            '%' => early_kprint!("%"),
+            '0'..='9' | '.' | '-' => continue,
+            'X' => early_kprint!("{:X}", args.arg::<c_uint>()),
+            'x' => early_kprint!("{:x}", args.arg::<c_uint>()),
+            'd' | 'i' => early_kprint!("{}", args.arg::<c_int>()),
+            's' => {
+                let ptr = args.arg::<*const c_char>();
+                early_kprint!("[{:?}]", ptr);
+
+                let str = CStr::from_ptr(ptr);
+                early_kprint!("{}", str.as_str().unwrap())
+            }
+            _ => unimplemented!("Printf ACPI: {} is not handled (full format: {})", c, fmt),
+        }
+        break;
+    }
+}
+
+unsafe fn _vprintf_impl(format: *const c_char, mut args: VaList) {
     let cstr = CStr::from_ptr(format).as_str().unwrap_or("not valid utf8");
-    early_kprint!("{}", cstr);
+    struct Data;
+    impl fmt::Write for Data {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            for c in s.chars() {
+                early_kprint!("{}", c);
+            }
+            Ok(())
+        }
+    }
+
+    format(format, args, output::fmt_write(&mut Data));
+}
+
+#[no_mangle]
+unsafe extern "C" fn AcpiOsPrintf(format: *const c_char, args: ...) -> () {
+    let mut a = args.clone();
+    _vprintf_impl(format, a.as_va_list());
 }
 
 #[no_mangle]
@@ -235,8 +266,9 @@ extern "C" fn AcpiOsUnmapMemory(addr: *const c_void, size: ACPI_SIZE) {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsVprintf(fmt: *const c_char, mut _va_list: core::ffi::VaList) {
-    early_kprint!("{}", unsafe { CStr::from_ptr(fmt).as_str().unwrap() });
+unsafe extern "C" fn AcpiOsVprintf(format: *const c_char, args: core::ffi::VaList) {
+    let mut a = args.clone();
+    _vprintf_impl(format, a.as_va_list());
 }
 
 #[no_mangle]

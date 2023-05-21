@@ -16,9 +16,6 @@ pub fn panic(info: &PanicInfo) -> ! {
         early_kprintln!("Reason: {:?}", message);
     }
 
-    early_kprintln!("\nAdditional Information:");
-    early_kprintln!("{:?}", info);
-
     early_kprintln!("----- [PANIC  END  HERE] -----\x1B\0");
 
     loop {}

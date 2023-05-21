@@ -51,12 +51,13 @@ impl BootInfo {
 
 impl Clone for BootInfo {
     fn clone(&self) -> BootInfo {
-        #[repr(align(16))]
+        #[repr(align(8))]
         #[derive(Copy, Clone)]
         pub struct BootInfoByte(u8);
 
         let data_ptr = self.header.as_ptr() as *const BootInfoByte;
         let length = self.len();
+        early_kprint!("Bootinfo slice: {:?} ({} bytes)", data_ptr, length);
         let slice = unsafe { core::slice::from_raw_parts(data_ptr, length) };
 
         let mut new_boot_info: Vec<BootInfoByte> = vec![BootInfoByte(0); slice.len()];
