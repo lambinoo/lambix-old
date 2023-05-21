@@ -70,9 +70,9 @@ extern "C" fn AcpiOsDeleteSemaphore() -> () {
 
 #[no_mangle]
 extern "C" fn AcpiOsEnterSleep(
-    SleepState: UINT8,
-    RegaValue: UINT32,
-    RegbValue: UINT32,
+    _SleepState: UINT8,
+    _RegaValue: UINT32,
+    _RegbValue: UINT32,
 ) -> ACPI_STATUS {
     0
 }
@@ -135,7 +135,7 @@ extern "C" fn AcpiOsMapMemory(
 
 #[no_mangle]
 extern "C" fn AcpiOsPhysicalTableOverride(
-    ExistingTable: *mut ACPI_TABLE_HEADER,
+    _ExistingTable: *mut ACPI_TABLE_HEADER,
     NewAddress: *mut ACPI_PHYSICAL_ADDRESS,
     NewTableLength: *mut UINT32,
 ) -> () {
@@ -147,7 +147,7 @@ extern "C" fn AcpiOsPhysicalTableOverride(
 
 #[no_mangle]
 extern "C" fn AcpiOsPredefinedOverride(
-    PredefinedObject: *mut ACPI_PREDEFINED_NAMES,
+    _PredefinedObject: *mut ACPI_PREDEFINED_NAMES,
     NewValue: *mut ACPI_STRING,
 ) -> () {
     unsafe {
@@ -234,7 +234,7 @@ extern "C" fn AcpiOsSignal() -> () {
 }
 
 #[no_mangle]
-extern "C" fn AcpiOsSignalSemaphore(Handle: *const (), Units: UINT32) -> ACPI_STATUS {
+extern "C" fn AcpiOsSignalSemaphore(_Handle: *const (), _Units: UINT32) -> ACPI_STATUS {
     1
 }
 
@@ -282,9 +282,9 @@ extern "C" fn AcpiOsWaitEventsComplete() -> () {
 
 #[no_mangle]
 extern "C" fn AcpiOsWaitSemaphore(
-    Handle: *mut c_void,
-    Units: UINT32,
-    Timeout: UINT16,
+    _Handle: *mut c_void,
+    _Units: UINT32,
+    _Timeout: UINT16,
 ) -> ACPI_STATUS {
     0
 }
